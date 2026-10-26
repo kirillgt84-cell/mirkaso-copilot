@@ -9,61 +9,12 @@ from typing import Any
 import pytest
 
 from mirkaso_copilot.agent import FALLBACK_ANSWERS, AgentConfig, run_agent
+from mirkaso_copilot.meta_client import MetaAPIError
 from mirkaso_copilot.providers import CallerContext, Tier
-from tests.conftest import AS_OF, FakeProvider
+from tests.conftest import AS_OF, FakeProvider, ScriptedClient, call, reply
 
 CTX = CallerContext(tier=Tier.TRADER)
 SECRET = "db password hunter2 at 10.0.0.1"
-
-
-def call(name: str, args: Any = None, call_id: str = "c1") -> dict[str, Any]:
-    arguments = args if isinstance(args, str) else json.dumps(args or {})
-    return {"id": call_id, "type": "function", "function": {"name": name, "arguments": arguments}}
-
-
-def reply(
-    content: str | None = None,
-    tool_calls: list[dict[str, Any]] | None = None,
-    *,
-    finish_reason: str | None = None,
-    usage: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    message: dict[str, Any] = {"role": "assistant", "content": content}
-    if tool_calls:
-        message["tool_calls"] = tool_calls
-    return {
-        "choices": [
-            {
-                "index": 0,
-                "message": message,
-                "finish_reason": finish_reason or ("tool_calls" if tool_calls else "stop"),
-            }
-        ],
-        "usage": usage
-        or {
-            "prompt_tokens": 100,
-            "completion_tokens": 20,
-            "total_tokens": 120,
-            "completion_tokens_details": {"reasoning_tokens": 5},
-        },
-    }
-
-
-class ScriptedClient:
-    """Returns scripted responses in order and records every request's messages."""
-
-    def __init__(self, *responses: dict[str, Any], delay: float = 0.0) -> None:
-        self.responses = list(responses)
-        self.requests: list[dict[str, Any]] = []
-        self.delay = delay
-
-    async def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
-        self.requests.append({"messages": json.loads(json.dumps(messages)), **kwargs})
-        if self.delay:
-            await asyncio.sleep(self.delay)
-        if not self.responses:
-            raise AssertionError("client called more often than scripted")
-        return self.responses.pop(0)
 
 
 def tool_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -408,3 +359,34 @@ def test_config_rejects_unknown_reasoning_effort(effort: str) -> None:
 
 def test_fallback_answers_have_no_numbers() -> None:
     assert all(_no_digits(text) for text in FALLBACK_ANSWERS.values())
+
+
+async def test_model_error_detail_stays_out_of_messages_and_logs(
+    provider: FakeProvider, caplog: pytest.LogCaptureFixture
+) -> None:
+    body = json.dumps({"error": {"message": f"Invalid API key ({SECRET})"}})
+
+    class Unauthorized:
+        async def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
+            raise MetaAPIError("Meta API returned HTTP 401", status_code=401, body=body)
+
+    with caplog.at_level(logging.DEBUG):
+        result = await run_agent("q", provider=provider, ctx=CTX, client=Unauthorized())
+
+    assert result.stop_reason == "error"
+    assert result.warnings == ["model_request_failed"]
+    assert result.warnings_detail == [
+        {
+            "warning": "model_request_failed",
+            "error_type": "MetaAPIError",
+            "status_code": 401,
+            "message": f"Invalid API key ({SECRET})",
+        }
+    ]
+    assert SECRET not in json.dumps(result.messages)
+    assert SECRET not in caplog.text
+
+
+async def test_successful_run_has_no_warning_details(provider: FakeProvider) -> None:
+    result = await run_agent("q", provider=provider, ctx=CTX, client=ScriptedClient(reply("ok")))
+    assert result.warnings_detail == []

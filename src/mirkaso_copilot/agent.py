@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from mirkaso_copilot.envelope import ErrorCode, error_result
-from mirkaso_copilot.meta_client import REASONING_EFFORTS, parse_usage
+from mirkaso_copilot.meta_client import REASONING_EFFORTS, describe_error, parse_usage
 from mirkaso_copilot.providers import CallerContext, DataProvider
 from mirkaso_copilot.tools.registry import canonical_call, execute_tool, tool_definitions
 
@@ -117,12 +117,18 @@ class AgentResult:
     latency_ms: float
     messages: list[dict[str, Any]]
     warnings: list[str] = field(default_factory=list)
+    # Opt-in diagnostics, one dict per warning that has details (see
+    # ``meta_client.describe_error``). Never sent to the model and never logged.
+    warnings_detail: list[dict[str, Any]] = field(default_factory=list)
 
 
 class _Stop(Exception):
-    def __init__(self, reason: str, warning: str | None = None) -> None:
+    def __init__(
+        self, reason: str, warning: str | None = None, detail: dict[str, Any] | None = None
+    ) -> None:
         self.reason = reason
         self.warning = warning
+        self.detail = detail
 
 
 def _parse_args(raw: Any) -> dict[str, Any] | None:
@@ -159,6 +165,7 @@ class _Run:
         self.usage = AgentUsage()
         self.seen: set[tuple[str, str]] = set()
         self.warnings: list[str] = []
+        self.warnings_detail: list[dict[str, Any]] = []
 
     async def loop(self) -> str:
         tools = tool_definitions()
@@ -177,7 +184,7 @@ class _Run:
             except Exception as exc:
                 logger.warning("agent step %d: model request failed (%s)", self.steps,
                                type(exc).__name__)  # fmt: skip
-                raise _Stop("error", "model_request_failed") from None
+                raise _Stop("error", "model_request_failed", describe_error(exc)) from None
             self.usage.add(body)
 
             if choice.get("finish_reason") == "length":
@@ -305,6 +312,8 @@ async def run_agent(
         stop_reason = stop.reason
         if stop.warning:
             run.warnings.append(stop.warning)
+            if stop.detail is not None:
+                run.warnings_detail.append({"warning": stop.warning, **stop.detail})
     except TimeoutError:
         stop_reason = "timeout"
     if stop_reason not in ("final", "truncated"):
@@ -319,6 +328,7 @@ async def run_agent(
         latency_ms=round((time.perf_counter() - start) * 1000, 1),
         messages=run.messages,
         warnings=run.warnings,
+        warnings_detail=run.warnings_detail,
     )
     logger.info(
         "agent run stop_reason=%s steps=%d tool_calls=%d prompt_tokens=%d "

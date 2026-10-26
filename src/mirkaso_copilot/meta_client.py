@@ -9,6 +9,7 @@ Configuration comes only from the environment:
 No retries yet: any failure surfaces to the caller as ``MetaAPIError``.
 """
 
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ import httpx
 DEFAULT_API_BASE = "https://api.meta.ai/v1"
 REASONING_EFFORTS = frozenset({"low", "medium", "high"})
 _MAX_ERROR_BODY = 500
+_MAX_DETAIL_MESSAGE = 200
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,48 @@ def parse_usage(body: dict[str, Any]) -> Usage:
         reasoning_tokens=reasoning,
         total_tokens=usage.get("total_tokens"),
     )
+
+
+def _body_error_message(body: str | None) -> str | None:
+    """The ``error.message`` (or ``message``/``error`` string) of an error body, else its text."""
+    if not body:
+        return None
+    try:
+        decoded = json.loads(body)
+    except ValueError:
+        decoded = None
+    message: object = None
+    if isinstance(decoded, dict):
+        error = decoded.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+        elif isinstance(error, str):
+            message = error
+        message = message or decoded.get("message")
+    if decoded is None:
+        message = body
+    if not isinstance(message, str) or not message.strip():
+        return None
+    return message.strip()[:_MAX_DETAIL_MESSAGE]
+
+
+def describe_error(exc: BaseException) -> dict[str, Any]:
+    """A short, safe description of a failed model request, for opt-in diagnostics.
+
+    ``{"error_type", "status_code", "message"}``. ``status_code`` and ``message`` are set
+    only when the API answered with an HTTP error; ``message`` is at most 200 characters of
+    the error message in the response body. Request headers (and so the API key) and
+    exception text are never included. Without an HTTP response (e.g. a connection error)
+    only the type of the underlying exception is given.
+    """
+    if isinstance(exc, MetaAPIError) and exc.status_code is not None:
+        return {
+            "error_type": type(exc).__name__,
+            "status_code": exc.status_code,
+            "message": _body_error_message(exc.body),
+        }
+    cause = exc.__cause__ if isinstance(exc, MetaAPIError) and exc.__cause__ else exc
+    return {"error_type": type(cause).__name__, "status_code": None, "message": None}
 
 
 def _require_env(name: str) -> str:

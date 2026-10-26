@@ -15,6 +15,9 @@ dependencies = [
     "pydantic>=2",
 ]
 
+[project.scripts]
+mirkaso-copilot-demo = "mirkaso_copilot.demo:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8",

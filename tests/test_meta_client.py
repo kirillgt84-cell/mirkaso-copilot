@@ -9,6 +9,7 @@ from mirkaso_copilot.meta_client import (
     MetaAPIError,
     MetaClient,
     MetaConfigError,
+    describe_error,
     parse_usage,
 )
 
@@ -109,3 +110,55 @@ def test_parse_usage_variants() -> None:
     assert parse_usage({}).reasoning_tokens is None
     assert parse_usage({"usage": {"reasoning_tokens": 3}}).reasoning_tokens == 3
     assert parse_usage(COMPLETION).total_tokens == 30
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        ({"error": {"message": "Invalid API key", "type": "auth"}}, "Invalid API key"),
+        ({"error": "nope"}, "nope"),
+        ({"message": "Rate limited"}, "Rate limited"),
+        ({"detail": []}, None),
+    ],
+)
+async def test_describe_http_error(env: None, body: dict[str, Any], message: str | None) -> None:
+    transport = httpx.MockTransport(lambda request: httpx.Response(401, json=body))
+    async with MetaClient(transport=transport) as client:
+        with pytest.raises(MetaAPIError) as exc_info:
+            await client.chat([{"role": "user", "content": "hi"}])
+    assert describe_error(exc_info.value) == {
+        "error_type": "MetaAPIError",
+        "status_code": 401,
+        "message": message,
+    }
+
+
+def test_describe_error_truncates_and_handles_plain_text() -> None:
+    long = MetaAPIError("x", status_code=500, body=json.dumps({"error": {"message": "m" * 400}}))
+    assert describe_error(long)["message"] == "m" * 200
+    plain = MetaAPIError("x", status_code=502, body="Bad gateway\n")
+    assert describe_error(plain)["message"] == "Bad gateway"
+    empty = MetaAPIError("x", status_code=503, body="")
+    assert describe_error(empty)["message"] is None
+
+
+async def test_describe_connection_error_gives_type_only(env: None) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused to secret-host", request=request)
+
+    async with MetaClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(MetaAPIError) as exc_info:
+            await client.chat([{"role": "user", "content": "hi"}])
+    assert describe_error(exc_info.value) == {
+        "error_type": "ConnectError",
+        "status_code": None,
+        "message": None,
+    }
+
+
+def test_describe_other_exceptions_gives_type_only() -> None:
+    assert describe_error(KeyError("choices")) == {
+        "error_type": "KeyError",
+        "status_code": None,
+        "message": None,
+    }
