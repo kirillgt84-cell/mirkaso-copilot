@@ -59,6 +59,21 @@ def _invalid_fields_message(exc: ValidationError) -> str:
     return "Invalid arguments: " + ", ".join(fields) + "."
 
 
+def canonical_call(name: str, args: dict[str, Any]) -> str | None:
+    """Canonical JSON of the validated params (defaults applied), or None if not valid.
+
+    Two calls with the same name and canonical params request the same data.
+    """
+    module = _TOOLS.get(name)
+    if module is None:
+        return None
+    try:
+        params = module.Params.model_validate(args)
+    except ValidationError:
+        return None
+    return json.dumps(params.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+
+
 async def execute_tool(
     name: str,
     args: str | bytes | dict[str, Any] | None,

@@ -94,6 +94,7 @@ class MetaClient:
         tool_choice: str | dict[str, Any] | None = None,
         response_format: dict[str, Any] | None = None,
         reasoning_effort: str | None = None,
+        max_tokens: int | None = None,
     ) -> dict[str, Any]:
         """POST /chat/completions and return the decoded response body."""
         if reasoning_effort is not None and reasoning_effort not in REASONING_EFFORTS:
@@ -108,6 +109,8 @@ class MetaClient:
             payload["response_format"] = response_format
         if reasoning_effort is not None:
             payload["reasoning_effort"] = reasoning_effort
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
 
         try:
             response = await self._http.post("chat/completions", json=payload)

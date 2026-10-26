@@ -57,6 +57,7 @@ async def test_chat_request_and_usage_logging(env: None, caplog: pytest.LogCaptu
                 tool_choice="auto",
                 response_format={"type": "json_object"},
                 reasoning_effort="low",
+                max_tokens=3000,
             )
 
     assert body == COMPLETION
@@ -71,6 +72,7 @@ async def test_chat_request_and_usage_logging(env: None, caplog: pytest.LogCaptu
         "tool_choice": "auto",
         "response_format": {"type": "json_object"},
         "reasoning_effort": "low",
+        "max_tokens": 3000,
     }
     assert "reasoning_tokens=7" in caplog.text
     assert "test-key" not in caplog.text
