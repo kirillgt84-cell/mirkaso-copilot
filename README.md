@@ -44,6 +44,49 @@ user ──► host app ──► Muse Spark (Meta Model API, /chat/completions)
 
 The tool contract is documented in [docs/tools.md](docs/tools.md).
 
+## Agent loop
+
+`mirkaso_copilot.agent.run_agent(question, provider=..., ctx=..., client=...)` runs the
+tool-calling loop: it sends the question with every tool definition
+(`tool_choice="auto"`), executes all tool calls of a step concurrently, feeds each
+result back as a `tool` message, and repeats until the model answers without tool calls.
+
+Limits (`AgentConfig`, all overridable):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `max_steps` | 6 | Model requests per run |
+| `max_tool_calls_total` | 12 | Tool calls per run |
+| `max_total_tokens` | 40000 | Tokens summed over all requests |
+| `request_max_tokens` | 3000 | `max_tokens` per request (reasoning tokens count toward it) |
+| `reasoning_effort` | `low` | `low`, `medium` or `high` |
+| `per_tool_timeout_s` | 15 | Time limit for one tool call |
+| `total_timeout_s` | 90 | Time limit for the whole run |
+
+Tool failures never stop the run. A tool error, a tool timeout, arguments that are not a
+JSON object, an unknown tool, or a repeat of the same tool with the same validated arguments
+(defaults applied, so `{}` and `{"history_days": 7}` match) all
+come back to the model as a structured error (`{"error": {"code", "message"}}`), so it
+can recover or explain.
+
+`AgentResult` carries `answer`, `stop_reason`, `steps`, a record per tool call (name,
+args, error code, latency, `source_id`, `as_of`), summed token usage including reasoning
+tokens, total latency, `warnings` and the full message transcript.
+
+| `stop_reason` | When | `answer` |
+|---|---|---|
+| `final` | The model answered without tool calls | The model's answer |
+| `max_steps` | The step limit was reached | Fixed fallback text |
+| `max_tool_calls` | The next step would exceed the tool-call limit | Fixed fallback text |
+| `max_tokens` | The token budget was exceeded | Fixed fallback text |
+| `timeout` | `total_timeout_s` elapsed | Fixed fallback text |
+| `truncated` | The model hit `finish_reason: "length"` | `None` |
+| `error` | The model request failed or returned an empty answer | Fixed fallback text |
+
+Fallback texts contain no numbers. Structured answers and numeric grounding (checking
+every number in an answer against the tool results in the transcript) are separate
+modules that are coming next.
+
 ## Tiers
 
 Gating uses four public tiers, lowest first:

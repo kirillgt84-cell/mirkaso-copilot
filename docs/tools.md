@@ -17,6 +17,8 @@ Every successful call returns:
 
 Failures return `{"error": {"code": ..., "message": ...}}` with one of these codes:
 `unknown_tool`, `invalid_arguments`, `not_found`, `upstream_unavailable`, `internal_error`.
+The agent loop adds `timeout` (per-tool time limit) and `duplicate_call` (same tool with
+the same validated arguments, defaults applied, already called in this run).
 Messages are fixed text. For `invalid_arguments` they list only the names of the
 offending fields.
 

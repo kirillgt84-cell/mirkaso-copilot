@@ -63,6 +63,8 @@ class ErrorCode(StrEnum):
     NOT_FOUND = "not_found"
     UPSTREAM_UNAVAILABLE = "upstream_unavailable"
     INTERNAL_ERROR = "internal_error"
+    TIMEOUT = "timeout"
+    DUPLICATE_CALL = "duplicate_call"
 
 
 DEFAULT_MESSAGES: dict[ErrorCode, str] = {
@@ -71,6 +73,8 @@ DEFAULT_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.NOT_FOUND: "No data found for the requested item.",
     ErrorCode.UPSTREAM_UNAVAILABLE: "Market data is temporarily unavailable. Try again later.",
     ErrorCode.INTERNAL_ERROR: "The tool failed unexpectedly.",
+    ErrorCode.TIMEOUT: "The tool did not respond in time.",
+    ErrorCode.DUPLICATE_CALL: "This exact call was already made; reuse its earlier result.",
 }
 
 
