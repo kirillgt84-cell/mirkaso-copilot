@@ -142,13 +142,13 @@ def test_macro_rebucket_sorts_by_time() -> None:
 
 
 def test_oi_rebucket_keeps_latest_level_per_bucket() -> None:
-    points = hourly_points(96, open_interest=lambda i: 1000 + i, price=lambda i: 10.0 + i)
+    points = hourly_points(96, open_interest_usd=lambda i: 1000 + i, price=lambda i: 10.0 + i)
     out = rebucket_open_interest(points, 24)
     assert len(out) == 24
-    assert out[0] == {"ts": "2026-10-20T03:00:00Z", "open_interest": 1003, "price": 13.0}
-    assert out[-1]["open_interest"] == 1095
+    assert out[0] == {"ts": "2026-10-20T03:00:00Z", "open_interest_usd": 1003, "price": 13.0}
+    assert out[-1]["open_interest_usd"] == 1095
 
 
 def test_oi_rebucket_never_exceeds_48() -> None:
-    points = hourly_points(500, open_interest=lambda i: i, price=lambda i: 1.0)
+    points = hourly_points(500, open_interest_usd=lambda i: i, price=lambda i: 1.0)
     assert len(rebucket_open_interest(points, 1000)) == 48

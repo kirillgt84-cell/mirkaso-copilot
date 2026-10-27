@@ -196,7 +196,7 @@ async def test_derivatives(provider: FakeProvider) -> None:
     assert out["data"]["symbol"] == "BTCUSDT"
     assert out["data"]["funding_rate"] == 0.0001
     assert len(out["data"]["history"]) == 12
-    assert set(out["data"]["history"][0]) == {"ts", "open_interest", "price"}
+    assert set(out["data"]["history"][0]) == {"ts", "open_interest_usd", "price"}
     assert provider.calls[0] == ("coin_derivatives", {"symbol": "BTCUSDT"})
 
 

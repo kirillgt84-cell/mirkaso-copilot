@@ -64,7 +64,7 @@ DERIVATIVES = {
     "price_change_1h_pct": 0.4,
     "price_change_4h_pct": 1.0,
     "price_change_24h_pct": 2.5,
-    "open_interest": 1.2e10,
+    "open_interest_usd": 1.2e10,
     "oi_change_1h_pct": 0.3,
     "oi_change_24h_pct": 4.2,
     "funding_rate": 0.0001,
@@ -89,7 +89,7 @@ class FakeProvider:
             7 * 24, score=lambda i: 50.0, regime=lambda i: "Neutral", panic_override=lambda i: False
         )
         self.oi_points = hourly_points(
-            96, open_interest=lambda i: 1e10 + i, price=lambda i: 67000.0 + i
+            96, open_interest_usd=lambda i: 1e10 + i, price=lambda i: 67000.0 + i
         )
         self.derivatives: dict[str, Any] | None = DERIVATIVES
         self.liquidations_payload: dict[str, Any] = {
