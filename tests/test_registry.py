@@ -1,9 +1,11 @@
 import json
+import re
 from typing import Any
 
 import pytest
 
 from mirkaso_copilot.providers import CallerContext, ProviderUnavailable, Tier
+from mirkaso_copilot.tools.macro_get_regime import regime_bands
 from mirkaso_copilot.tools.registry import execute_tool, tool_definitions, tool_names
 from tests.conftest import FakeProvider
 
@@ -116,7 +118,12 @@ async def test_json_string_args_and_defaults(provider: FakeProvider) -> None:
 
 async def test_none_args_mean_defaults(provider: FakeProvider) -> None:
     out = await execute_tool("macro_get_regime", None, provider, GUEST)
-    assert out["data"] == {"score": 57.0, "regime": "Neutral", "panic_override": False}
+    assert out["data"] == {
+        "score": 57.0,
+        "regime": "Neutral",
+        "panic_override": False,
+        "bands": regime_bands(),
+    }
     assert out["as_of"] == "2026-10-26T12:00:00Z"
     assert out["source_id"] == "mirkaso.macro"
 
@@ -145,7 +152,7 @@ async def test_scanner_guest_masked_coin_filter_returns_nothing(provider: FakePr
     out = await execute_tool("scanner_get_signals", {"base_asset": "sol"}, provider, GUEST)
     assert out["gated"] is True
     assert "base_asset_filter" in out["gated_fields"]
-    assert out["data"] == {"signals": []}
+    assert out["data"] == {"signals": [], "score_max": 13}
     assert provider.calls == []
 
 
@@ -270,3 +277,38 @@ async def test_macro_current_regime(
     out = await execute_tool("macro_get_regime", {}, provider, GUEST)
     assert out["data"]["regime"] == regime
     assert out["data"]["panic_override"] is panic
+
+
+# Numbers the model may see in a description: timeframes (1h, 24-hour, 7d), field and
+# sector names (price_change_1h_pct, layer-1s) and caps on what a call may return
+# ("up to 48 points", "max 48"). Data thresholds and scales belong in the result, where
+# an answer can point at them.
+_ALLOWED_NUMBERS = re.compile(
+    r"\b[a-z0-9]+(?:_[a-z0-9]+)+\b"  # field names
+    r"|\blayer-\d+s?\b"
+    r"|\b\d+(?:[hd]|[- ]hours?|[- ]days?)\b"
+    r"|\b(?:up to|max) \d+\b"
+)
+
+
+def test_tool_descriptions_state_no_data_numbers() -> None:
+    for d in tool_definitions():
+        description = _ALLOWED_NUMBERS.sub("", d["function"]["description"])
+        assert not re.search(r"\d", description), d["function"]["name"]
+
+
+async def test_macro_bands_are_in_the_result(provider: FakeProvider) -> None:
+    out = await execute_tool("macro_get_regime", {}, provider, TRADER)
+    assert out["data"]["bands"] == [
+        {"label": "Panic", "min": 0, "max": 20},
+        {"label": "Risk OFF", "min": 20, "max": 35},
+        {"label": "Cautious", "min": 35, "max": 50},
+        {"label": "Neutral", "min": 50, "max": 65},
+        {"label": "Risk ON", "min": 65, "max": 80},
+        {"label": "Strong Risk ON", "min": 80, "max": 100},
+    ]
+
+
+async def test_scanner_result_carries_the_score_scale(provider: FakeProvider) -> None:
+    out = await execute_tool("scanner_get_signals", {}, provider, TRADER)
+    assert out["data"]["score_max"] == 13
