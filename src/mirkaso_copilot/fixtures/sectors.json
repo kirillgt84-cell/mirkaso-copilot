@@ -1,0 +1,137 @@
+{
+ "notice": "synthetic demo data - not real market data",
+ "base_time": "2026-10-26T12:00:00Z",
+ "as_of": "2026-10-26T12:00:00Z",
+ "sectors": [
+  {
+   "slug": "ai",
+   "asset_class": "crypto",
+   "sector_score": 74.2,
+   "sector_score_delta_24h": 6.8,
+   "price_change_24h_pct": 4.9,
+   "oi_change_24h_pct": 7.2,
+   "breadth_ratio": 0.82,
+   "relative_strength_btc": 1.41
+  },
+  {
+   "slug": "layer-1",
+   "asset_class": "crypto",
+   "sector_score": 63.5,
+   "sector_score_delta_24h": 2.1,
+   "price_change_24h_pct": 2.6,
+   "oi_change_24h_pct": 3.0,
+   "breadth_ratio": 0.68,
+   "relative_strength_btc": 1.08
+  },
+  {
+   "slug": "layer-2",
+   "asset_class": "crypto",
+   "sector_score": 41.8,
+   "sector_score_delta_24h": -3.4,
+   "price_change_24h_pct": -1.7,
+   "oi_change_24h_pct": -0.9,
+   "breadth_ratio": 0.35,
+   "relative_strength_btc": 0.82
+  },
+  {
+   "slug": "defi",
+   "asset_class": "crypto",
+   "sector_score": 55.9,
+   "sector_score_delta_24h": 1.2,
+   "price_change_24h_pct": 1.8,
+   "oi_change_24h_pct": 2.2,
+   "breadth_ratio": 0.57,
+   "relative_strength_btc": 0.97
+  },
+  {
+   "slug": "meme",
+   "asset_class": "crypto",
+   "sector_score": 47.3,
+   "sector_score_delta_24h": -5.9,
+   "price_change_24h_pct": -2.8,
+   "oi_change_24h_pct": 4.1,
+   "breadth_ratio": 0.31,
+   "relative_strength_btc": 0.74
+  },
+  {
+   "slug": "gaming",
+   "asset_class": "crypto",
+   "sector_score": 36.4,
+   "sector_score_delta_24h": -1.8,
+   "price_change_24h_pct": -1.2,
+   "oi_change_24h_pct": -2.5,
+   "breadth_ratio": 0.29,
+   "relative_strength_btc": 0.69
+  },
+  {
+   "slug": "rwa",
+   "asset_class": "crypto",
+   "sector_score": 68.7,
+   "sector_score_delta_24h": 4.4,
+   "price_change_24h_pct": 3.5,
+   "oi_change_24h_pct": 5.6,
+   "breadth_ratio": 0.75,
+   "relative_strength_btc": 1.22
+  },
+  {
+   "slug": "depin",
+   "asset_class": "crypto",
+   "sector_score": 58.1,
+   "sector_score_delta_24h": 3.0,
+   "price_change_24h_pct": 2.2,
+   "oi_change_24h_pct": 1.4,
+   "breadth_ratio": 0.61,
+   "relative_strength_btc": 1.02
+  },
+  {
+   "slug": "exchange-tokens",
+   "asset_class": "crypto",
+   "sector_score": 52.6,
+   "sector_score_delta_24h": 0.4,
+   "price_change_24h_pct": 0.9,
+   "oi_change_24h_pct": 0.3,
+   "breadth_ratio": 0.5,
+   "relative_strength_btc": 0.91
+  },
+  {
+   "slug": "privacy",
+   "asset_class": "crypto",
+   "sector_score": 44.0,
+   "sector_score_delta_24h": -0.7,
+   "price_change_24h_pct": -0.4,
+   "oi_change_24h_pct": -1.1,
+   "breadth_ratio": 0.42,
+   "relative_strength_btc": 0.85
+  },
+  {
+   "slug": "us-indices",
+   "asset_class": "tradfi",
+   "sector_score": 61.2,
+   "sector_score_delta_24h": 1.5,
+   "price_change_24h_pct": 0.8,
+   "oi_change_24h_pct": 0.6,
+   "breadth_ratio": 0.71,
+   "relative_strength_btc": 0.88
+  },
+  {
+   "slug": "precious-metals",
+   "asset_class": "tradfi",
+   "sector_score": 66.9,
+   "sector_score_delta_24h": 2.7,
+   "price_change_24h_pct": 1.3,
+   "oi_change_24h_pct": 2.0,
+   "breadth_ratio": 0.8,
+   "relative_strength_btc": 0.93
+  },
+  {
+   "slug": "energy",
+   "asset_class": "tradfi",
+   "sector_score": 39.5,
+   "sector_score_delta_24h": -2.2,
+   "price_change_24h_pct": -1.6,
+   "oi_change_24h_pct": -0.8,
+   "breadth_ratio": 0.33,
+   "relative_strength_btc": 0.62
+  }
+ ]
+}

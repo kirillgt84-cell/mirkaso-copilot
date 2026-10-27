@@ -1,0 +1,1947 @@
+{
+ "notice": "synthetic demo data - not real market data",
+ "base_time": "2026-10-26T12:00:00Z",
+ "as_of": "2026-10-26T12:00:00Z",
+ "periods": {
+  "1h": {
+   "newest_event_at": "2026-10-26T11:59:18Z",
+   "summary": {
+    "total_usd": 2090800.0,
+    "long_usd": 1396400.0,
+    "short_usd": 694400.0,
+    "long_pct": 66.8,
+    "short_pct": 33.2,
+    "count": 224
+   },
+   "top_coins": [
+    {
+     "symbol": "BTCUSDT",
+     "total_usd": 461400.0,
+     "long_usd": 369500.0,
+     "short_usd": 91900.0,
+     "count": 60
+    },
+    {
+     "symbol": "ETHUSDT",
+     "total_usd": 295300.0,
+     "long_usd": 221000.0,
+     "short_usd": 74300.0,
+     "count": 42
+    },
+    {
+     "symbol": "SOLUSDT",
+     "total_usd": 217600.0,
+     "long_usd": 162800.0,
+     "short_usd": 54800.0,
+     "count": 31
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "total_usd": 119600.0,
+     "long_usd": 95800.0,
+     "short_usd": 23800.0,
+     "count": 15
+    },
+    {
+     "symbol": "XRPUSDT",
+     "total_usd": 77800.0,
+     "long_usd": 58200.0,
+     "short_usd": 19600.0,
+     "count": 11
+    },
+    {
+     "symbol": "SUIUSDT",
+     "total_usd": 62200.0,
+     "long_usd": 46500.0,
+     "short_usd": 15700.0,
+     "count": 8
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "total_usd": 59800.0,
+     "long_usd": 47900.0,
+     "short_usd": 11900.0,
+     "count": 7
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "total_usd": 46600.0,
+     "long_usd": 34900.0,
+     "short_usd": 11700.0,
+     "count": 6
+    },
+    {
+     "symbol": "LINKUSDT",
+     "total_usd": 38900.0,
+     "long_usd": 29100.0,
+     "short_usd": 9800.0,
+     "count": 5
+    },
+    {
+     "symbol": "ARBUSDT",
+     "total_usd": 34200.0,
+     "long_usd": 27400.0,
+     "short_usd": 6800.0,
+     "count": 4
+    },
+    {
+     "symbol": "FETUSDT",
+     "total_usd": 27900.0,
+     "long_usd": 20900.0,
+     "short_usd": 7000.0,
+     "count": 4
+    },
+    {
+     "symbol": "WIFUSDT",
+     "total_usd": 23300.0,
+     "long_usd": 17400.0,
+     "short_usd": 5900.0,
+     "count": 3
+    },
+    {
+     "symbol": "ADAUSDT",
+     "total_usd": 20500.0,
+     "long_usd": 16400.0,
+     "short_usd": 4100.0,
+     "count": 2
+    },
+    {
+     "symbol": "OPUSDT",
+     "total_usd": 15500.0,
+     "long_usd": 11600.0,
+     "short_usd": 3900.0,
+     "count": 2
+    },
+    {
+     "symbol": "NEARUSDT",
+     "total_usd": 12400.0,
+     "long_usd": 9300.0,
+     "short_usd": 3100.0,
+     "count": 1
+    }
+   ],
+   "time_series": [
+    {
+     "bucket": "2026-10-26T11:00:00Z",
+     "long_usd": 107800.0,
+     "short_usd": 134200.0
+    },
+    {
+     "bucket": "2026-10-26T11:05:00Z",
+     "long_usd": 80200.0,
+     "short_usd": 51100.0
+    },
+    {
+     "bucket": "2026-10-26T11:10:00Z",
+     "long_usd": 243500.0,
+     "short_usd": 63200.0
+    },
+    {
+     "bucket": "2026-10-26T11:15:00Z",
+     "long_usd": 171200.0,
+     "short_usd": 110200.0
+    },
+    {
+     "bucket": "2026-10-26T11:20:00Z",
+     "long_usd": 29100.0,
+     "short_usd": 18000.0
+    },
+    {
+     "bucket": "2026-10-26T11:25:00Z",
+     "long_usd": 103400.0,
+     "short_usd": 53000.0
+    },
+    {
+     "bucket": "2026-10-26T11:30:00Z",
+     "long_usd": 107600.0,
+     "short_usd": 64200.0
+    },
+    {
+     "bucket": "2026-10-26T11:35:00Z",
+     "long_usd": 181700.0,
+     "short_usd": 25500.0
+    },
+    {
+     "bucket": "2026-10-26T11:40:00Z",
+     "long_usd": 171300.0,
+     "short_usd": 30200.0
+    },
+    {
+     "bucket": "2026-10-26T11:45:00Z",
+     "long_usd": 64200.0,
+     "short_usd": 52700.0
+    },
+    {
+     "bucket": "2026-10-26T11:50:00Z",
+     "long_usd": 47300.0,
+     "short_usd": 24400.0
+    },
+    {
+     "bucket": "2026-10-26T11:55:00Z",
+     "long_usd": 89100.0,
+     "short_usd": 67700.0
+    }
+   ]
+  },
+  "4h": {
+   "newest_event_at": "2026-10-26T11:59:18Z",
+   "summary": {
+    "total_usd": 11501200.0,
+    "long_usd": 8061700.0,
+    "short_usd": 3439500.0,
+    "long_pct": 70.1,
+    "short_pct": 29.9,
+    "count": 1236
+   },
+   "top_coins": [
+    {
+     "symbol": "BTCUSDT",
+     "total_usd": 2588100.0,
+     "long_usd": 2133100.0,
+     "short_usd": 455000.0,
+     "count": 333
+    },
+    {
+     "symbol": "ETHUSDT",
+     "total_usd": 1644200.0,
+     "long_usd": 1275900.0,
+     "short_usd": 368300.0,
+     "count": 234
+    },
+    {
+     "symbol": "SOLUSDT",
+     "total_usd": 1211500.0,
+     "long_usd": 940200.0,
+     "short_usd": 271300.0,
+     "count": 173
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "total_usd": 671000.0,
+     "long_usd": 553000.0,
+     "short_usd": 118000.0,
+     "count": 86
+    },
+    {
+     "symbol": "XRPUSDT",
+     "total_usd": 432700.0,
+     "long_usd": 335800.0,
+     "short_usd": 96900.0,
+     "count": 61
+    },
+    {
+     "symbol": "SUIUSDT",
+     "total_usd": 346100.0,
+     "long_usd": 268600.0,
+     "short_usd": 77500.0,
+     "count": 49
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "total_usd": 335500.0,
+     "long_usd": 276500.0,
+     "short_usd": 59000.0,
+     "count": 43
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "total_usd": 259600.0,
+     "long_usd": 201500.0,
+     "short_usd": 58100.0,
+     "count": 37
+    },
+    {
+     "symbol": "LINKUSDT",
+     "total_usd": 216400.0,
+     "long_usd": 167900.0,
+     "short_usd": 48500.0,
+     "count": 30
+    },
+    {
+     "symbol": "ARBUSDT",
+     "total_usd": 191700.0,
+     "long_usd": 158000.0,
+     "short_usd": 33700.0,
+     "count": 24
+    },
+    {
+     "symbol": "FETUSDT",
+     "total_usd": 155800.0,
+     "long_usd": 120900.0,
+     "short_usd": 34900.0,
+     "count": 22
+    },
+    {
+     "symbol": "WIFUSDT",
+     "total_usd": 129800.0,
+     "long_usd": 100700.0,
+     "short_usd": 29100.0,
+     "count": 18
+    },
+    {
+     "symbol": "ADAUSDT",
+     "total_usd": 115000.0,
+     "long_usd": 94800.0,
+     "short_usd": 20200.0,
+     "count": 14
+    },
+    {
+     "symbol": "OPUSDT",
+     "total_usd": 86600.0,
+     "long_usd": 67200.0,
+     "short_usd": 19400.0,
+     "count": 12
+    },
+    {
+     "symbol": "NEARUSDT",
+     "total_usd": 69200.0,
+     "long_usd": 53700.0,
+     "short_usd": 15500.0,
+     "count": 9
+    }
+   ],
+   "time_series": [
+    {
+     "bucket": "2026-10-26T08:00:00Z",
+     "long_usd": 736600.0,
+     "short_usd": 224200.0
+    },
+    {
+     "bucket": "2026-10-26T08:15:00Z",
+     "long_usd": 3286000.0,
+     "short_usd": 260900.0
+    },
+    {
+     "bucket": "2026-10-26T08:30:00Z",
+     "long_usd": 242500.0,
+     "short_usd": 308900.0
+    },
+    {
+     "bucket": "2026-10-26T08:45:00Z",
+     "long_usd": 150600.0,
+     "short_usd": 119600.0
+    },
+    {
+     "bucket": "2026-10-26T09:00:00Z",
+     "long_usd": 396100.0,
+     "short_usd": 73200.0
+    },
+    {
+     "bucket": "2026-10-26T09:15:00Z",
+     "long_usd": 150500.0,
+     "short_usd": 238600.0
+    },
+    {
+     "bucket": "2026-10-26T09:30:00Z",
+     "long_usd": 70600.0,
+     "short_usd": 129300.0
+    },
+    {
+     "bucket": "2026-10-26T09:45:00Z",
+     "long_usd": 351600.0,
+     "short_usd": 230900.0
+    },
+    {
+     "bucket": "2026-10-26T10:00:00Z",
+     "long_usd": 405600.0,
+     "short_usd": 144200.0
+    },
+    {
+     "bucket": "2026-10-26T10:15:00Z",
+     "long_usd": 357600.0,
+     "short_usd": 289000.0
+    },
+    {
+     "bucket": "2026-10-26T10:30:00Z",
+     "long_usd": 311000.0,
+     "short_usd": 354400.0
+    },
+    {
+     "bucket": "2026-10-26T10:45:00Z",
+     "long_usd": 206600.0,
+     "short_usd": 371900.0
+    },
+    {
+     "bucket": "2026-10-26T11:00:00Z",
+     "long_usd": 431500.0,
+     "short_usd": 248500.0
+    },
+    {
+     "bucket": "2026-10-26T11:15:00Z",
+     "long_usd": 303700.0,
+     "short_usd": 181200.0
+    },
+    {
+     "bucket": "2026-10-26T11:30:00Z",
+     "long_usd": 460600.0,
+     "short_usd": 119900.0
+    },
+    {
+     "bucket": "2026-10-26T11:45:00Z",
+     "long_usd": 200600.0,
+     "short_usd": 144800.0
+    }
+   ]
+  },
+  "24h": {
+   "newest_event_at": "2026-10-26T11:59:18Z",
+   "summary": {
+    "total_usd": 56867100.0,
+    "long_usd": 37085600.0,
+    "short_usd": 19781500.0,
+    "long_pct": 65.2,
+    "short_pct": 34.8,
+    "count": 6114
+   },
+   "top_coins": [
+    {
+     "symbol": "BTCUSDT",
+     "total_usd": 12429900.0,
+     "long_usd": 9812800.0,
+     "short_usd": 2617100.0,
+     "count": 1650
+    },
+    {
+     "symbol": "ETHUSDT",
+     "total_usd": 7987400.0,
+     "long_usd": 5869500.0,
+     "short_usd": 2117900.0,
+     "count": 1161
+    },
+    {
+     "symbol": "SOLUSDT",
+     "total_usd": 5885500.0,
+     "long_usd": 4324900.0,
+     "short_usd": 1560600.0,
+     "count": 855
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "total_usd": 3222600.0,
+     "long_usd": 2544100.0,
+     "short_usd": 678500.0,
+     "count": 427
+    },
+    {
+     "symbol": "XRPUSDT",
+     "total_usd": 2101900.0,
+     "long_usd": 1544600.0,
+     "short_usd": 557300.0,
+     "count": 305
+    },
+    {
+     "symbol": "SUIUSDT",
+     "total_usd": 1681600.0,
+     "long_usd": 1235700.0,
+     "short_usd": 445900.0,
+     "count": 244
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "total_usd": 1611300.0,
+     "long_usd": 1272000.0,
+     "short_usd": 339300.0,
+     "count": 213
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "total_usd": 1261200.0,
+     "long_usd": 926800.0,
+     "short_usd": 334400.0,
+     "count": 183
+    },
+    {
+     "symbol": "LINKUSDT",
+     "total_usd": 1051000.0,
+     "long_usd": 772300.0,
+     "short_usd": 278700.0,
+     "count": 152
+    },
+    {
+     "symbol": "ARBUSDT",
+     "total_usd": 920800.0,
+     "long_usd": 726900.0,
+     "short_usd": 193900.0,
+     "count": 122
+    },
+    {
+     "symbol": "FETUSDT",
+     "total_usd": 756700.0,
+     "long_usd": 556100.0,
+     "short_usd": 200600.0,
+     "count": 110
+    },
+    {
+     "symbol": "WIFUSDT",
+     "total_usd": 630600.0,
+     "long_usd": 463400.0,
+     "short_usd": 167200.0,
+     "count": 91
+    },
+    {
+     "symbol": "ADAUSDT",
+     "total_usd": 552400.0,
+     "long_usd": 436100.0,
+     "short_usd": 116300.0,
+     "count": 73
+    },
+    {
+     "symbol": "OPUSDT",
+     "total_usd": 420400.0,
+     "long_usd": 308900.0,
+     "short_usd": 111500.0,
+     "count": 61
+    },
+    {
+     "symbol": "NEARUSDT",
+     "total_usd": 336300.0,
+     "long_usd": 247100.0,
+     "short_usd": 89200.0,
+     "count": 48
+    }
+   ],
+   "time_series": [
+    {
+     "bucket": "2026-10-25T12:00:00Z",
+     "long_usd": 192900.0,
+     "short_usd": 151400.0
+    },
+    {
+     "bucket": "2026-10-25T12:15:00Z",
+     "long_usd": 208300.0,
+     "short_usd": 322500.0
+    },
+    {
+     "bucket": "2026-10-25T12:30:00Z",
+     "long_usd": 142500.0,
+     "short_usd": 100900.0
+    },
+    {
+     "bucket": "2026-10-25T12:45:00Z",
+     "long_usd": 242900.0,
+     "short_usd": 155300.0
+    },
+    {
+     "bucket": "2026-10-25T13:00:00Z",
+     "long_usd": 278700.0,
+     "short_usd": 342700.0
+    },
+    {
+     "bucket": "2026-10-25T13:15:00Z",
+     "long_usd": 361800.0,
+     "short_usd": 107200.0
+    },
+    {
+     "bucket": "2026-10-25T13:30:00Z",
+     "long_usd": 314800.0,
+     "short_usd": 83400.0
+    },
+    {
+     "bucket": "2026-10-25T13:45:00Z",
+     "long_usd": 451100.0,
+     "short_usd": 293200.0
+    },
+    {
+     "bucket": "2026-10-25T14:00:00Z",
+     "long_usd": 476900.0,
+     "short_usd": 171400.0
+    },
+    {
+     "bucket": "2026-10-25T14:15:00Z",
+     "long_usd": 278400.0,
+     "short_usd": 228800.0
+    },
+    {
+     "bucket": "2026-10-25T14:30:00Z",
+     "long_usd": 283000.0,
+     "short_usd": 230700.0
+    },
+    {
+     "bucket": "2026-10-25T14:45:00Z",
+     "long_usd": 403100.0,
+     "short_usd": 163200.0
+    },
+    {
+     "bucket": "2026-10-25T15:00:00Z",
+     "long_usd": 322500.0,
+     "short_usd": 111900.0
+    },
+    {
+     "bucket": "2026-10-25T15:15:00Z",
+     "long_usd": 110800.0,
+     "short_usd": 155800.0
+    },
+    {
+     "bucket": "2026-10-25T15:30:00Z",
+     "long_usd": 207800.0,
+     "short_usd": 125300.0
+    },
+    {
+     "bucket": "2026-10-25T15:45:00Z",
+     "long_usd": 208100.0,
+     "short_usd": 429700.0
+    },
+    {
+     "bucket": "2026-10-25T16:00:00Z",
+     "long_usd": 321700.0,
+     "short_usd": 215800.0
+    },
+    {
+     "bucket": "2026-10-25T16:15:00Z",
+     "long_usd": 135900.0,
+     "short_usd": 251800.0
+    },
+    {
+     "bucket": "2026-10-25T16:30:00Z",
+     "long_usd": 247200.0,
+     "short_usd": 138700.0
+    },
+    {
+     "bucket": "2026-10-25T16:45:00Z",
+     "long_usd": 372100.0,
+     "short_usd": 234400.0
+    },
+    {
+     "bucket": "2026-10-25T17:00:00Z",
+     "long_usd": 253300.0,
+     "short_usd": 479300.0
+    },
+    {
+     "bucket": "2026-10-25T17:15:00Z",
+     "long_usd": 431000.0,
+     "short_usd": 147600.0
+    },
+    {
+     "bucket": "2026-10-25T17:30:00Z",
+     "long_usd": 245800.0,
+     "short_usd": 284400.0
+    },
+    {
+     "bucket": "2026-10-25T17:45:00Z",
+     "long_usd": 190400.0,
+     "short_usd": 270700.0
+    },
+    {
+     "bucket": "2026-10-25T18:00:00Z",
+     "long_usd": 385700.0,
+     "short_usd": 97400.0
+    },
+    {
+     "bucket": "2026-10-25T18:15:00Z",
+     "long_usd": 555700.0,
+     "short_usd": 91800.0
+    },
+    {
+     "bucket": "2026-10-25T18:30:00Z",
+     "long_usd": 331100.0,
+     "short_usd": 251100.0
+    },
+    {
+     "bucket": "2026-10-25T18:45:00Z",
+     "long_usd": 253800.0,
+     "short_usd": 182500.0
+    },
+    {
+     "bucket": "2026-10-25T19:00:00Z",
+     "long_usd": 563100.0,
+     "short_usd": 364500.0
+    },
+    {
+     "bucket": "2026-10-25T19:15:00Z",
+     "long_usd": 208500.0,
+     "short_usd": 408800.0
+    },
+    {
+     "bucket": "2026-10-25T19:30:00Z",
+     "long_usd": 260200.0,
+     "short_usd": 537000.0
+    },
+    {
+     "bucket": "2026-10-25T19:45:00Z",
+     "long_usd": 688700.0,
+     "short_usd": 285600.0
+    },
+    {
+     "bucket": "2026-10-25T20:00:00Z",
+     "long_usd": 271500.0,
+     "short_usd": 130600.0
+    },
+    {
+     "bucket": "2026-10-25T20:15:00Z",
+     "long_usd": 367100.0,
+     "short_usd": 285600.0
+    },
+    {
+     "bucket": "2026-10-25T20:30:00Z",
+     "long_usd": 224000.0,
+     "short_usd": 152100.0
+    },
+    {
+     "bucket": "2026-10-25T20:45:00Z",
+     "long_usd": 360300.0,
+     "short_usd": 224600.0
+    },
+    {
+     "bucket": "2026-10-25T21:00:00Z",
+     "long_usd": 225700.0,
+     "short_usd": 193500.0
+    },
+    {
+     "bucket": "2026-10-25T21:15:00Z",
+     "long_usd": 177100.0,
+     "short_usd": 311900.0
+    },
+    {
+     "bucket": "2026-10-25T21:30:00Z",
+     "long_usd": 214800.0,
+     "short_usd": 116900.0
+    },
+    {
+     "bucket": "2026-10-25T21:45:00Z",
+     "long_usd": 333900.0,
+     "short_usd": 186100.0
+    },
+    {
+     "bucket": "2026-10-25T22:00:00Z",
+     "long_usd": 284400.0,
+     "short_usd": 173000.0
+    },
+    {
+     "bucket": "2026-10-25T22:15:00Z",
+     "long_usd": 330600.0,
+     "short_usd": 207700.0
+    },
+    {
+     "bucket": "2026-10-25T22:30:00Z",
+     "long_usd": 204000.0,
+     "short_usd": 256200.0
+    },
+    {
+     "bucket": "2026-10-25T22:45:00Z",
+     "long_usd": 177200.0,
+     "short_usd": 203100.0
+    },
+    {
+     "bucket": "2026-10-25T23:00:00Z",
+     "long_usd": 191300.0,
+     "short_usd": 131500.0
+    },
+    {
+     "bucket": "2026-10-25T23:15:00Z",
+     "long_usd": 194400.0,
+     "short_usd": 108600.0
+    },
+    {
+     "bucket": "2026-10-25T23:30:00Z",
+     "long_usd": 638300.0,
+     "short_usd": 108400.0
+    },
+    {
+     "bucket": "2026-10-25T23:45:00Z",
+     "long_usd": 295500.0,
+     "short_usd": 152300.0
+    },
+    {
+     "bucket": "2026-10-26T00:00:00Z",
+     "long_usd": 340400.0,
+     "short_usd": 59400.0
+    },
+    {
+     "bucket": "2026-10-26T00:15:00Z",
+     "long_usd": 529200.0,
+     "short_usd": 165100.0
+    },
+    {
+     "bucket": "2026-10-26T00:30:00Z",
+     "long_usd": 148900.0,
+     "short_usd": 124800.0
+    },
+    {
+     "bucket": "2026-10-26T00:45:00Z",
+     "long_usd": 234700.0,
+     "short_usd": 165000.0
+    },
+    {
+     "bucket": "2026-10-26T01:00:00Z",
+     "long_usd": 264500.0,
+     "short_usd": 464100.0
+    },
+    {
+     "bucket": "2026-10-26T01:15:00Z",
+     "long_usd": 321500.0,
+     "short_usd": 199500.0
+    },
+    {
+     "bucket": "2026-10-26T01:30:00Z",
+     "long_usd": 171700.0,
+     "short_usd": 133100.0
+    },
+    {
+     "bucket": "2026-10-26T01:45:00Z",
+     "long_usd": 371800.0,
+     "short_usd": 263500.0
+    },
+    {
+     "bucket": "2026-10-26T02:00:00Z",
+     "long_usd": 365000.0,
+     "short_usd": 193100.0
+    },
+    {
+     "bucket": "2026-10-26T02:15:00Z",
+     "long_usd": 277100.0,
+     "short_usd": 209400.0
+    },
+    {
+     "bucket": "2026-10-26T02:30:00Z",
+     "long_usd": 225200.0,
+     "short_usd": 255000.0
+    },
+    {
+     "bucket": "2026-10-26T02:45:00Z",
+     "long_usd": 404800.0,
+     "short_usd": 267500.0
+    },
+    {
+     "bucket": "2026-10-26T03:00:00Z",
+     "long_usd": 352600.0,
+     "short_usd": 282300.0
+    },
+    {
+     "bucket": "2026-10-26T03:15:00Z",
+     "long_usd": 961300.0,
+     "short_usd": 83200.0
+    },
+    {
+     "bucket": "2026-10-26T03:30:00Z",
+     "long_usd": 267900.0,
+     "short_usd": 190700.0
+    },
+    {
+     "bucket": "2026-10-26T03:45:00Z",
+     "long_usd": 508000.0,
+     "short_usd": 100600.0
+    },
+    {
+     "bucket": "2026-10-26T04:00:00Z",
+     "long_usd": 140900.0,
+     "short_usd": 186600.0
+    },
+    {
+     "bucket": "2026-10-26T04:15:00Z",
+     "long_usd": 447000.0,
+     "short_usd": 153300.0
+    },
+    {
+     "bucket": "2026-10-26T04:30:00Z",
+     "long_usd": 307100.0,
+     "short_usd": 96200.0
+    },
+    {
+     "bucket": "2026-10-26T04:45:00Z",
+     "long_usd": 488000.0,
+     "short_usd": 87800.0
+    },
+    {
+     "bucket": "2026-10-26T05:00:00Z",
+     "long_usd": 323000.0,
+     "short_usd": 238800.0
+    },
+    {
+     "bucket": "2026-10-26T05:15:00Z",
+     "long_usd": 208700.0,
+     "short_usd": 283200.0
+    },
+    {
+     "bucket": "2026-10-26T05:30:00Z",
+     "long_usd": 386400.0,
+     "short_usd": 154300.0
+    },
+    {
+     "bucket": "2026-10-26T05:45:00Z",
+     "long_usd": 829900.0,
+     "short_usd": 166900.0
+    },
+    {
+     "bucket": "2026-10-26T06:00:00Z",
+     "long_usd": 172700.0,
+     "short_usd": 282800.0
+    },
+    {
+     "bucket": "2026-10-26T06:15:00Z",
+     "long_usd": 737000.0,
+     "short_usd": 188400.0
+    },
+    {
+     "bucket": "2026-10-26T06:30:00Z",
+     "long_usd": 212300.0,
+     "short_usd": 144700.0
+    },
+    {
+     "bucket": "2026-10-26T06:45:00Z",
+     "long_usd": 304400.0,
+     "short_usd": 112700.0
+    },
+    {
+     "bucket": "2026-10-26T07:00:00Z",
+     "long_usd": 504300.0,
+     "short_usd": 230900.0
+    },
+    {
+     "bucket": "2026-10-26T07:15:00Z",
+     "long_usd": 1161600.0,
+     "short_usd": 83400.0
+    },
+    {
+     "bucket": "2026-10-26T07:30:00Z",
+     "long_usd": 1142600.0,
+     "short_usd": 193500.0
+    },
+    {
+     "bucket": "2026-10-26T07:45:00Z",
+     "long_usd": 1495500.0,
+     "short_usd": 225300.0
+    },
+    {
+     "bucket": "2026-10-26T08:00:00Z",
+     "long_usd": 736600.0,
+     "short_usd": 224200.0
+    },
+    {
+     "bucket": "2026-10-26T08:15:00Z",
+     "long_usd": 3286000.0,
+     "short_usd": 260900.0
+    },
+    {
+     "bucket": "2026-10-26T08:30:00Z",
+     "long_usd": 242500.0,
+     "short_usd": 308900.0
+    },
+    {
+     "bucket": "2026-10-26T08:45:00Z",
+     "long_usd": 150600.0,
+     "short_usd": 119600.0
+    },
+    {
+     "bucket": "2026-10-26T09:00:00Z",
+     "long_usd": 396100.0,
+     "short_usd": 73200.0
+    },
+    {
+     "bucket": "2026-10-26T09:15:00Z",
+     "long_usd": 150500.0,
+     "short_usd": 238600.0
+    },
+    {
+     "bucket": "2026-10-26T09:30:00Z",
+     "long_usd": 70600.0,
+     "short_usd": 129300.0
+    },
+    {
+     "bucket": "2026-10-26T09:45:00Z",
+     "long_usd": 351600.0,
+     "short_usd": 230900.0
+    },
+    {
+     "bucket": "2026-10-26T10:00:00Z",
+     "long_usd": 405600.0,
+     "short_usd": 144200.0
+    },
+    {
+     "bucket": "2026-10-26T10:15:00Z",
+     "long_usd": 357600.0,
+     "short_usd": 289000.0
+    },
+    {
+     "bucket": "2026-10-26T10:30:00Z",
+     "long_usd": 311000.0,
+     "short_usd": 354400.0
+    },
+    {
+     "bucket": "2026-10-26T10:45:00Z",
+     "long_usd": 206600.0,
+     "short_usd": 371900.0
+    },
+    {
+     "bucket": "2026-10-26T11:00:00Z",
+     "long_usd": 431500.0,
+     "short_usd": 248500.0
+    },
+    {
+     "bucket": "2026-10-26T11:15:00Z",
+     "long_usd": 303700.0,
+     "short_usd": 181200.0
+    },
+    {
+     "bucket": "2026-10-26T11:30:00Z",
+     "long_usd": 460600.0,
+     "short_usd": 119900.0
+    },
+    {
+     "bucket": "2026-10-26T11:45:00Z",
+     "long_usd": 200600.0,
+     "short_usd": 144800.0
+    }
+   ]
+  },
+  "7d": {
+   "newest_event_at": "2026-10-26T11:59:18Z",
+   "summary": {
+    "total_usd": 354321200.0,
+    "long_usd": 210888900.0,
+    "short_usd": 143432300.0,
+    "long_pct": 59.5,
+    "short_pct": 40.5,
+    "count": 38099
+   },
+   "top_coins": [
+    {
+     "symbol": "BTCUSDT",
+     "total_usd": 74777300.0,
+     "long_usd": 55801200.0,
+     "short_usd": 18976100.0,
+     "count": 10286
+    },
+    {
+     "symbol": "ETHUSDT",
+     "total_usd": 48734000.0,
+     "long_usd": 33377400.0,
+     "short_usd": 15356600.0,
+     "count": 7238
+    },
+    {
+     "symbol": "SOLUSDT",
+     "total_usd": 35909300.0,
+     "long_usd": 24593900.0,
+     "short_usd": 11315400.0,
+     "count": 5333
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "total_usd": 19386700.0,
+     "long_usd": 14467000.0,
+     "short_usd": 4919700.0,
+     "count": 2666
+    },
+    {
+     "symbol": "XRPUSDT",
+     "total_usd": 12824700.0,
+     "long_usd": 8783500.0,
+     "short_usd": 4041200.0,
+     "count": 1904
+    },
+    {
+     "symbol": "SUIUSDT",
+     "total_usd": 10259800.0,
+     "long_usd": 7026800.0,
+     "short_usd": 3233000.0,
+     "count": 1523
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "total_usd": 9693400.0,
+     "long_usd": 7233500.0,
+     "short_usd": 2459900.0,
+     "count": 1333
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "total_usd": 7694800.0,
+     "long_usd": 5270100.0,
+     "short_usd": 2424700.0,
+     "count": 1142
+    },
+    {
+     "symbol": "LINKUSDT",
+     "total_usd": 6412400.0,
+     "long_usd": 4391800.0,
+     "short_usd": 2020600.0,
+     "count": 952
+    },
+    {
+     "symbol": "ARBUSDT",
+     "total_usd": 5539000.0,
+     "long_usd": 4133400.0,
+     "short_usd": 1405600.0,
+     "count": 761
+    },
+    {
+     "symbol": "FETUSDT",
+     "total_usd": 4616900.0,
+     "long_usd": 3162100.0,
+     "short_usd": 1454800.0,
+     "count": 685
+    },
+    {
+     "symbol": "WIFUSDT",
+     "total_usd": 3847500.0,
+     "long_usd": 2635100.0,
+     "short_usd": 1212400.0,
+     "count": 571
+    },
+    {
+     "symbol": "ADAUSDT",
+     "total_usd": 3323500.0,
+     "long_usd": 2480100.0,
+     "short_usd": 843400.0,
+     "count": 457
+    },
+    {
+     "symbol": "OPUSDT",
+     "total_usd": 2564900.0,
+     "long_usd": 1756700.0,
+     "short_usd": 808200.0,
+     "count": 380
+    },
+    {
+     "symbol": "NEARUSDT",
+     "total_usd": 2052000.0,
+     "long_usd": 1405400.0,
+     "short_usd": 646600.0,
+     "count": 304
+    }
+   ],
+   "time_series": [
+    {
+     "bucket": "2026-10-19T12:00:00Z",
+     "long_usd": 1618600.0,
+     "short_usd": 675800.0
+    },
+    {
+     "bucket": "2026-10-19T13:00:00Z",
+     "long_usd": 962600.0,
+     "short_usd": 1011200.0
+    },
+    {
+     "bucket": "2026-10-19T14:00:00Z",
+     "long_usd": 1545600.0,
+     "short_usd": 603600.0
+    },
+    {
+     "bucket": "2026-10-19T15:00:00Z",
+     "long_usd": 1229500.0,
+     "short_usd": 1181800.0
+    },
+    {
+     "bucket": "2026-10-19T16:00:00Z",
+     "long_usd": 680800.0,
+     "short_usd": 1114200.0
+    },
+    {
+     "bucket": "2026-10-19T17:00:00Z",
+     "long_usd": 973300.0,
+     "short_usd": 819500.0
+    },
+    {
+     "bucket": "2026-10-19T18:00:00Z",
+     "long_usd": 949800.0,
+     "short_usd": 947500.0
+    },
+    {
+     "bucket": "2026-10-19T19:00:00Z",
+     "long_usd": 1080100.0,
+     "short_usd": 802800.0
+    },
+    {
+     "bucket": "2026-10-19T20:00:00Z",
+     "long_usd": 1100500.0,
+     "short_usd": 1248400.0
+    },
+    {
+     "bucket": "2026-10-19T21:00:00Z",
+     "long_usd": 1025800.0,
+     "short_usd": 747800.0
+    },
+    {
+     "bucket": "2026-10-19T22:00:00Z",
+     "long_usd": 920800.0,
+     "short_usd": 841600.0
+    },
+    {
+     "bucket": "2026-10-19T23:00:00Z",
+     "long_usd": 957700.0,
+     "short_usd": 1021000.0
+    },
+    {
+     "bucket": "2026-10-20T00:00:00Z",
+     "long_usd": 1934900.0,
+     "short_usd": 865500.0
+    },
+    {
+     "bucket": "2026-10-20T01:00:00Z",
+     "long_usd": 1117000.0,
+     "short_usd": 712900.0
+    },
+    {
+     "bucket": "2026-10-20T02:00:00Z",
+     "long_usd": 1109800.0,
+     "short_usd": 935800.0
+    },
+    {
+     "bucket": "2026-10-20T03:00:00Z",
+     "long_usd": 1054400.0,
+     "short_usd": 976200.0
+    },
+    {
+     "bucket": "2026-10-20T04:00:00Z",
+     "long_usd": 1389400.0,
+     "short_usd": 824800.0
+    },
+    {
+     "bucket": "2026-10-20T05:00:00Z",
+     "long_usd": 1408400.0,
+     "short_usd": 683300.0
+    },
+    {
+     "bucket": "2026-10-20T06:00:00Z",
+     "long_usd": 1033200.0,
+     "short_usd": 741600.0
+    },
+    {
+     "bucket": "2026-10-20T07:00:00Z",
+     "long_usd": 1336700.0,
+     "short_usd": 869700.0
+    },
+    {
+     "bucket": "2026-10-20T08:00:00Z",
+     "long_usd": 1058200.0,
+     "short_usd": 944000.0
+    },
+    {
+     "bucket": "2026-10-20T09:00:00Z",
+     "long_usd": 1054400.0,
+     "short_usd": 911000.0
+    },
+    {
+     "bucket": "2026-10-20T10:00:00Z",
+     "long_usd": 1236100.0,
+     "short_usd": 1059200.0
+    },
+    {
+     "bucket": "2026-10-20T11:00:00Z",
+     "long_usd": 822600.0,
+     "short_usd": 1301800.0
+    },
+    {
+     "bucket": "2026-10-20T12:00:00Z",
+     "long_usd": 1077700.0,
+     "short_usd": 1109800.0
+    },
+    {
+     "bucket": "2026-10-20T13:00:00Z",
+     "long_usd": 984700.0,
+     "short_usd": 669200.0
+    },
+    {
+     "bucket": "2026-10-20T14:00:00Z",
+     "long_usd": 1486500.0,
+     "short_usd": 626300.0
+    },
+    {
+     "bucket": "2026-10-20T15:00:00Z",
+     "long_usd": 809600.0,
+     "short_usd": 1050600.0
+    },
+    {
+     "bucket": "2026-10-20T16:00:00Z",
+     "long_usd": 1278000.0,
+     "short_usd": 821800.0
+    },
+    {
+     "bucket": "2026-10-20T17:00:00Z",
+     "long_usd": 1084200.0,
+     "short_usd": 997500.0
+    },
+    {
+     "bucket": "2026-10-20T18:00:00Z",
+     "long_usd": 1637400.0,
+     "short_usd": 1023300.0
+    },
+    {
+     "bucket": "2026-10-20T19:00:00Z",
+     "long_usd": 943700.0,
+     "short_usd": 881000.0
+    },
+    {
+     "bucket": "2026-10-20T20:00:00Z",
+     "long_usd": 1825200.0,
+     "short_usd": 781800.0
+    },
+    {
+     "bucket": "2026-10-20T21:00:00Z",
+     "long_usd": 1313100.0,
+     "short_usd": 790100.0
+    },
+    {
+     "bucket": "2026-10-20T22:00:00Z",
+     "long_usd": 1753700.0,
+     "short_usd": 464100.0
+    },
+    {
+     "bucket": "2026-10-20T23:00:00Z",
+     "long_usd": 1773300.0,
+     "short_usd": 712700.0
+    },
+    {
+     "bucket": "2026-10-21T00:00:00Z",
+     "long_usd": 1013900.0,
+     "short_usd": 725300.0
+    },
+    {
+     "bucket": "2026-10-21T01:00:00Z",
+     "long_usd": 1269100.0,
+     "short_usd": 1069400.0
+    },
+    {
+     "bucket": "2026-10-21T02:00:00Z",
+     "long_usd": 1503100.0,
+     "short_usd": 1024000.0
+    },
+    {
+     "bucket": "2026-10-21T03:00:00Z",
+     "long_usd": 1506900.0,
+     "short_usd": 1005400.0
+    },
+    {
+     "bucket": "2026-10-21T04:00:00Z",
+     "long_usd": 1102800.0,
+     "short_usd": 928000.0
+    },
+    {
+     "bucket": "2026-10-21T05:00:00Z",
+     "long_usd": 971000.0,
+     "short_usd": 815200.0
+    },
+    {
+     "bucket": "2026-10-21T06:00:00Z",
+     "long_usd": 1189000.0,
+     "short_usd": 1131300.0
+    },
+    {
+     "bucket": "2026-10-21T07:00:00Z",
+     "long_usd": 957400.0,
+     "short_usd": 927100.0
+    },
+    {
+     "bucket": "2026-10-21T08:00:00Z",
+     "long_usd": 1323000.0,
+     "short_usd": 1055100.0
+    },
+    {
+     "bucket": "2026-10-21T09:00:00Z",
+     "long_usd": 797200.0,
+     "short_usd": 851700.0
+    },
+    {
+     "bucket": "2026-10-21T10:00:00Z",
+     "long_usd": 1142400.0,
+     "short_usd": 984600.0
+    },
+    {
+     "bucket": "2026-10-21T11:00:00Z",
+     "long_usd": 1102700.0,
+     "short_usd": 806900.0
+    },
+    {
+     "bucket": "2026-10-21T12:00:00Z",
+     "long_usd": 1453200.0,
+     "short_usd": 1350700.0
+    },
+    {
+     "bucket": "2026-10-21T13:00:00Z",
+     "long_usd": 1039200.0,
+     "short_usd": 743700.0
+    },
+    {
+     "bucket": "2026-10-21T14:00:00Z",
+     "long_usd": 1154400.0,
+     "short_usd": 1209600.0
+    },
+    {
+     "bucket": "2026-10-21T15:00:00Z",
+     "long_usd": 1060900.0,
+     "short_usd": 821600.0
+    },
+    {
+     "bucket": "2026-10-21T16:00:00Z",
+     "long_usd": 1518500.0,
+     "short_usd": 755300.0
+    },
+    {
+     "bucket": "2026-10-21T17:00:00Z",
+     "long_usd": 956600.0,
+     "short_usd": 871500.0
+    },
+    {
+     "bucket": "2026-10-21T18:00:00Z",
+     "long_usd": 786800.0,
+     "short_usd": 778500.0
+    },
+    {
+     "bucket": "2026-10-21T19:00:00Z",
+     "long_usd": 965700.0,
+     "short_usd": 793900.0
+    },
+    {
+     "bucket": "2026-10-21T20:00:00Z",
+     "long_usd": 1009700.0,
+     "short_usd": 826000.0
+    },
+    {
+     "bucket": "2026-10-21T21:00:00Z",
+     "long_usd": 888500.0,
+     "short_usd": 1119600.0
+    },
+    {
+     "bucket": "2026-10-21T22:00:00Z",
+     "long_usd": 1359900.0,
+     "short_usd": 803000.0
+    },
+    {
+     "bucket": "2026-10-21T23:00:00Z",
+     "long_usd": 1319600.0,
+     "short_usd": 773300.0
+    },
+    {
+     "bucket": "2026-10-22T00:00:00Z",
+     "long_usd": 1258000.0,
+     "short_usd": 716400.0
+    },
+    {
+     "bucket": "2026-10-22T01:00:00Z",
+     "long_usd": 1357100.0,
+     "short_usd": 623700.0
+    },
+    {
+     "bucket": "2026-10-22T02:00:00Z",
+     "long_usd": 1216000.0,
+     "short_usd": 803400.0
+    },
+    {
+     "bucket": "2026-10-22T03:00:00Z",
+     "long_usd": 1576100.0,
+     "short_usd": 736700.0
+    },
+    {
+     "bucket": "2026-10-22T04:00:00Z",
+     "long_usd": 1796900.0,
+     "short_usd": 702200.0
+    },
+    {
+     "bucket": "2026-10-22T05:00:00Z",
+     "long_usd": 1332400.0,
+     "short_usd": 577700.0
+    },
+    {
+     "bucket": "2026-10-22T06:00:00Z",
+     "long_usd": 1149800.0,
+     "short_usd": 835400.0
+    },
+    {
+     "bucket": "2026-10-22T07:00:00Z",
+     "long_usd": 1204700.0,
+     "short_usd": 575300.0
+    },
+    {
+     "bucket": "2026-10-22T08:00:00Z",
+     "long_usd": 1739500.0,
+     "short_usd": 714800.0
+    },
+    {
+     "bucket": "2026-10-22T09:00:00Z",
+     "long_usd": 1743900.0,
+     "short_usd": 922000.0
+    },
+    {
+     "bucket": "2026-10-22T10:00:00Z",
+     "long_usd": 1168300.0,
+     "short_usd": 1039600.0
+    },
+    {
+     "bucket": "2026-10-22T11:00:00Z",
+     "long_usd": 1458800.0,
+     "short_usd": 1040400.0
+    },
+    {
+     "bucket": "2026-10-22T12:00:00Z",
+     "long_usd": 1435300.0,
+     "short_usd": 1169300.0
+    },
+    {
+     "bucket": "2026-10-22T13:00:00Z",
+     "long_usd": 1597100.0,
+     "short_usd": 670000.0
+    },
+    {
+     "bucket": "2026-10-22T14:00:00Z",
+     "long_usd": 1139700.0,
+     "short_usd": 613600.0
+    },
+    {
+     "bucket": "2026-10-22T15:00:00Z",
+     "long_usd": 1345700.0,
+     "short_usd": 828100.0
+    },
+    {
+     "bucket": "2026-10-22T16:00:00Z",
+     "long_usd": 855800.0,
+     "short_usd": 751800.0
+    },
+    {
+     "bucket": "2026-10-22T17:00:00Z",
+     "long_usd": 1331200.0,
+     "short_usd": 636900.0
+    },
+    {
+     "bucket": "2026-10-22T18:00:00Z",
+     "long_usd": 1194100.0,
+     "short_usd": 809900.0
+    },
+    {
+     "bucket": "2026-10-22T19:00:00Z",
+     "long_usd": 1183300.0,
+     "short_usd": 638400.0
+    },
+    {
+     "bucket": "2026-10-22T20:00:00Z",
+     "long_usd": 1143900.0,
+     "short_usd": 818600.0
+    },
+    {
+     "bucket": "2026-10-22T21:00:00Z",
+     "long_usd": 904100.0,
+     "short_usd": 988500.0
+    },
+    {
+     "bucket": "2026-10-22T22:00:00Z",
+     "long_usd": 1254800.0,
+     "short_usd": 670200.0
+    },
+    {
+     "bucket": "2026-10-22T23:00:00Z",
+     "long_usd": 1094600.0,
+     "short_usd": 798300.0
+    },
+    {
+     "bucket": "2026-10-23T00:00:00Z",
+     "long_usd": 1375200.0,
+     "short_usd": 759100.0
+    },
+    {
+     "bucket": "2026-10-23T01:00:00Z",
+     "long_usd": 865800.0,
+     "short_usd": 891300.0
+    },
+    {
+     "bucket": "2026-10-23T02:00:00Z",
+     "long_usd": 1162900.0,
+     "short_usd": 760000.0
+    },
+    {
+     "bucket": "2026-10-23T03:00:00Z",
+     "long_usd": 1641100.0,
+     "short_usd": 891600.0
+    },
+    {
+     "bucket": "2026-10-23T04:00:00Z",
+     "long_usd": 1427100.0,
+     "short_usd": 723400.0
+    },
+    {
+     "bucket": "2026-10-23T05:00:00Z",
+     "long_usd": 1560900.0,
+     "short_usd": 860900.0
+    },
+    {
+     "bucket": "2026-10-23T06:00:00Z",
+     "long_usd": 1207900.0,
+     "short_usd": 806000.0
+    },
+    {
+     "bucket": "2026-10-23T07:00:00Z",
+     "long_usd": 952300.0,
+     "short_usd": 856000.0
+    },
+    {
+     "bucket": "2026-10-23T08:00:00Z",
+     "long_usd": 865800.0,
+     "short_usd": 577900.0
+    },
+    {
+     "bucket": "2026-10-23T09:00:00Z",
+     "long_usd": 1139800.0,
+     "short_usd": 731500.0
+    },
+    {
+     "bucket": "2026-10-23T10:00:00Z",
+     "long_usd": 1684100.0,
+     "short_usd": 833000.0
+    },
+    {
+     "bucket": "2026-10-23T11:00:00Z",
+     "long_usd": 894400.0,
+     "short_usd": 908800.0
+    },
+    {
+     "bucket": "2026-10-23T12:00:00Z",
+     "long_usd": 1009800.0,
+     "short_usd": 670600.0
+    },
+    {
+     "bucket": "2026-10-23T13:00:00Z",
+     "long_usd": 960700.0,
+     "short_usd": 852300.0
+    },
+    {
+     "bucket": "2026-10-23T14:00:00Z",
+     "long_usd": 1047700.0,
+     "short_usd": 1180400.0
+    },
+    {
+     "bucket": "2026-10-23T15:00:00Z",
+     "long_usd": 1713200.0,
+     "short_usd": 662800.0
+    },
+    {
+     "bucket": "2026-10-23T16:00:00Z",
+     "long_usd": 1397600.0,
+     "short_usd": 1096500.0
+    },
+    {
+     "bucket": "2026-10-23T17:00:00Z",
+     "long_usd": 873900.0,
+     "short_usd": 865500.0
+    },
+    {
+     "bucket": "2026-10-23T18:00:00Z",
+     "long_usd": 1062200.0,
+     "short_usd": 571200.0
+    },
+    {
+     "bucket": "2026-10-23T19:00:00Z",
+     "long_usd": 1134500.0,
+     "short_usd": 794800.0
+    },
+    {
+     "bucket": "2026-10-23T20:00:00Z",
+     "long_usd": 1024900.0,
+     "short_usd": 835000.0
+    },
+    {
+     "bucket": "2026-10-23T21:00:00Z",
+     "long_usd": 1276500.0,
+     "short_usd": 881600.0
+    },
+    {
+     "bucket": "2026-10-23T22:00:00Z",
+     "long_usd": 1125500.0,
+     "short_usd": 991200.0
+    },
+    {
+     "bucket": "2026-10-23T23:00:00Z",
+     "long_usd": 1176000.0,
+     "short_usd": 973200.0
+    },
+    {
+     "bucket": "2026-10-24T00:00:00Z",
+     "long_usd": 1339500.0,
+     "short_usd": 1092500.0
+    },
+    {
+     "bucket": "2026-10-24T01:00:00Z",
+     "long_usd": 1092500.0,
+     "short_usd": 835700.0
+    },
+    {
+     "bucket": "2026-10-24T02:00:00Z",
+     "long_usd": 1516900.0,
+     "short_usd": 1095200.0
+    },
+    {
+     "bucket": "2026-10-24T03:00:00Z",
+     "long_usd": 1755700.0,
+     "short_usd": 794800.0
+    },
+    {
+     "bucket": "2026-10-24T04:00:00Z",
+     "long_usd": 1042700.0,
+     "short_usd": 898400.0
+    },
+    {
+     "bucket": "2026-10-24T05:00:00Z",
+     "long_usd": 1003600.0,
+     "short_usd": 837600.0
+    },
+    {
+     "bucket": "2026-10-24T06:00:00Z",
+     "long_usd": 1234500.0,
+     "short_usd": 968100.0
+    },
+    {
+     "bucket": "2026-10-24T07:00:00Z",
+     "long_usd": 1460900.0,
+     "short_usd": 672000.0
+    },
+    {
+     "bucket": "2026-10-24T08:00:00Z",
+     "long_usd": 881000.0,
+     "short_usd": 649500.0
+    },
+    {
+     "bucket": "2026-10-24T09:00:00Z",
+     "long_usd": 1204200.0,
+     "short_usd": 793400.0
+    },
+    {
+     "bucket": "2026-10-24T10:00:00Z",
+     "long_usd": 1041700.0,
+     "short_usd": 609100.0
+    },
+    {
+     "bucket": "2026-10-24T11:00:00Z",
+     "long_usd": 1383500.0,
+     "short_usd": 956000.0
+    },
+    {
+     "bucket": "2026-10-24T12:00:00Z",
+     "long_usd": 1009000.0,
+     "short_usd": 933100.0
+    },
+    {
+     "bucket": "2026-10-24T13:00:00Z",
+     "long_usd": 1638000.0,
+     "short_usd": 986800.0
+    },
+    {
+     "bucket": "2026-10-24T14:00:00Z",
+     "long_usd": 1103400.0,
+     "short_usd": 896700.0
+    },
+    {
+     "bucket": "2026-10-24T15:00:00Z",
+     "long_usd": 812600.0,
+     "short_usd": 979000.0
+    },
+    {
+     "bucket": "2026-10-24T16:00:00Z",
+     "long_usd": 1245200.0,
+     "short_usd": 974400.0
+    },
+    {
+     "bucket": "2026-10-24T17:00:00Z",
+     "long_usd": 1096800.0,
+     "short_usd": 754400.0
+    },
+    {
+     "bucket": "2026-10-24T18:00:00Z",
+     "long_usd": 1222000.0,
+     "short_usd": 1086400.0
+    },
+    {
+     "bucket": "2026-10-24T19:00:00Z",
+     "long_usd": 1320100.0,
+     "short_usd": 946700.0
+    },
+    {
+     "bucket": "2026-10-24T20:00:00Z",
+     "long_usd": 1313600.0,
+     "short_usd": 871300.0
+    },
+    {
+     "bucket": "2026-10-24T21:00:00Z",
+     "long_usd": 1451000.0,
+     "short_usd": 909900.0
+    },
+    {
+     "bucket": "2026-10-24T22:00:00Z",
+     "long_usd": 853200.0,
+     "short_usd": 895600.0
+    },
+    {
+     "bucket": "2026-10-24T23:00:00Z",
+     "long_usd": 1080900.0,
+     "short_usd": 701100.0
+    },
+    {
+     "bucket": "2026-10-25T00:00:00Z",
+     "long_usd": 1273100.0,
+     "short_usd": 707700.0
+    },
+    {
+     "bucket": "2026-10-25T01:00:00Z",
+     "long_usd": 1273600.0,
+     "short_usd": 1008700.0
+    },
+    {
+     "bucket": "2026-10-25T02:00:00Z",
+     "long_usd": 956400.0,
+     "short_usd": 738100.0
+    },
+    {
+     "bucket": "2026-10-25T03:00:00Z",
+     "long_usd": 1377400.0,
+     "short_usd": 773600.0
+    },
+    {
+     "bucket": "2026-10-25T04:00:00Z",
+     "long_usd": 1436800.0,
+     "short_usd": 674900.0
+    },
+    {
+     "bucket": "2026-10-25T05:00:00Z",
+     "long_usd": 805400.0,
+     "short_usd": 812300.0
+    },
+    {
+     "bucket": "2026-10-25T06:00:00Z",
+     "long_usd": 1177400.0,
+     "short_usd": 864200.0
+    },
+    {
+     "bucket": "2026-10-25T07:00:00Z",
+     "long_usd": 1306000.0,
+     "short_usd": 768000.0
+    },
+    {
+     "bucket": "2026-10-25T08:00:00Z",
+     "long_usd": 997800.0,
+     "short_usd": 840300.0
+    },
+    {
+     "bucket": "2026-10-25T09:00:00Z",
+     "long_usd": 960300.0,
+     "short_usd": 764400.0
+    },
+    {
+     "bucket": "2026-10-25T10:00:00Z",
+     "long_usd": 918000.0,
+     "short_usd": 1180600.0
+    },
+    {
+     "bucket": "2026-10-25T11:00:00Z",
+     "long_usd": 1198900.0,
+     "short_usd": 784600.0
+    },
+    {
+     "bucket": "2026-10-25T12:00:00Z",
+     "long_usd": 786600.0,
+     "short_usd": 730100.0
+    },
+    {
+     "bucket": "2026-10-25T13:00:00Z",
+     "long_usd": 1406400.0,
+     "short_usd": 826500.0
+    },
+    {
+     "bucket": "2026-10-25T14:00:00Z",
+     "long_usd": 1441400.0,
+     "short_usd": 794100.0
+    },
+    {
+     "bucket": "2026-10-25T15:00:00Z",
+     "long_usd": 849200.0,
+     "short_usd": 822700.0
+    },
+    {
+     "bucket": "2026-10-25T16:00:00Z",
+     "long_usd": 1076900.0,
+     "short_usd": 840700.0
+    },
+    {
+     "bucket": "2026-10-25T17:00:00Z",
+     "long_usd": 1120500.0,
+     "short_usd": 1182000.0
+    },
+    {
+     "bucket": "2026-10-25T18:00:00Z",
+     "long_usd": 1526300.0,
+     "short_usd": 622800.0
+    },
+    {
+     "bucket": "2026-10-25T19:00:00Z",
+     "long_usd": 1720500.0,
+     "short_usd": 1595900.0
+    },
+    {
+     "bucket": "2026-10-25T20:00:00Z",
+     "long_usd": 1222900.0,
+     "short_usd": 792900.0
+    },
+    {
+     "bucket": "2026-10-25T21:00:00Z",
+     "long_usd": 951500.0,
+     "short_usd": 808400.0
+    },
+    {
+     "bucket": "2026-10-25T22:00:00Z",
+     "long_usd": 996200.0,
+     "short_usd": 840000.0
+    },
+    {
+     "bucket": "2026-10-25T23:00:00Z",
+     "long_usd": 1319500.0,
+     "short_usd": 500800.0
+    },
+    {
+     "bucket": "2026-10-26T00:00:00Z",
+     "long_usd": 1253200.0,
+     "short_usd": 514300.0
+    },
+    {
+     "bucket": "2026-10-26T01:00:00Z",
+     "long_usd": 1129500.0,
+     "short_usd": 1060200.0
+    },
+    {
+     "bucket": "2026-10-26T02:00:00Z",
+     "long_usd": 1272100.0,
+     "short_usd": 925000.0
+    },
+    {
+     "bucket": "2026-10-26T03:00:00Z",
+     "long_usd": 2089800.0,
+     "short_usd": 656800.0
+    },
+    {
+     "bucket": "2026-10-26T04:00:00Z",
+     "long_usd": 1383000.0,
+     "short_usd": 523900.0
+    },
+    {
+     "bucket": "2026-10-26T05:00:00Z",
+     "long_usd": 1748000.0,
+     "short_usd": 843200.0
+    },
+    {
+     "bucket": "2026-10-26T06:00:00Z",
+     "long_usd": 1426400.0,
+     "short_usd": 728600.0
+    },
+    {
+     "bucket": "2026-10-26T07:00:00Z",
+     "long_usd": 4304000.0,
+     "short_usd": 733100.0
+    },
+    {
+     "bucket": "2026-10-26T08:00:00Z",
+     "long_usd": 4415700.0,
+     "short_usd": 913600.0
+    },
+    {
+     "bucket": "2026-10-26T09:00:00Z",
+     "long_usd": 968800.0,
+     "short_usd": 672000.0
+    },
+    {
+     "bucket": "2026-10-26T10:00:00Z",
+     "long_usd": 1280800.0,
+     "short_usd": 1159500.0
+    },
+    {
+     "bucket": "2026-10-26T11:00:00Z",
+     "long_usd": 1396400.0,
+     "short_usd": 694400.0
+    }
+   ]
+  }
+ }
+}
