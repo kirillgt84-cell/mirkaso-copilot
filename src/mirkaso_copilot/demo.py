@@ -4,16 +4,19 @@ Usage::
 
     mirkaso-copilot-demo "Which sectors are strongest right now?" [--tier trader]
         [--effort low] [--json] [--show-tools] [--fixed-time] [--verbose] [--structured]
+        [--single-phase]
 
 Reads ``META_API_KEY`` and ``META_MODEL`` (both required) and ``META_API_BASE``
 (optional) from the environment. The key is never printed. If ``META_PRICE_IN_PER_M``
 and ``META_PRICE_OUT_PER_M`` (USD per million prompt / completion tokens) are set, an
 estimated cost is printed too. All market data is synthetic demo data, shifted to the
-current time unless ``--fixed-time`` is given. ``--structured`` adds the second phase
-that asks for a structured answer and resolves its values against the tool results.
+current time unless ``--fixed-time`` is given. ``--structured`` returns only a verified
+answer: a structured answer whose values are resolved against the tool results and that
+passes the grounding guard, or a refusal. ``--single-phase`` (implies ``--structured``)
+is an experiment that sends the schema with every tool-loop request.
 
-Exit status: 0 when the model gave a final answer, 1 for any other stop reason,
-2 for configuration errors.
+Exit status: 0 when the model gave a final answer (with ``--structured``: a verified
+one), 1 otherwise, 2 for configuration errors.
 """
 
 import argparse
@@ -75,8 +78,14 @@ def build_parser() -> argparse.ArgumentParser:
     )  # fmt: skip
     parser.add_argument(
         "--structured", action="store_true",
-        help="Ask for a structured answer whose numbers the server resolves from the tool "
-        "results, and print it with a table of the resolved values.",
+        help="Return only a verified answer: numbers resolved by the server from the tool "
+        "results and checked by the grounding guard, or a refusal. Prints the values table, "
+        "guard metrics and per-phase usage.",
+    )  # fmt: skip
+    parser.add_argument(
+        "--single-phase", action="store_true",
+        help="Experiment (implies --structured): send the answer schema with every tool-loop "
+        "request instead of making a separate structured request.",
     )  # fmt: skip
     return parser
 
@@ -130,7 +139,7 @@ def _table(rows: list[list[str]]) -> list[str]:
 
 
 def format_structured(result: AgentResult) -> list[str]:
-    """The resolved summary, claims and caveats, then the values table and any errors."""
+    """The verified summary, claims and caveats, then the table of resolved values."""
     resolved = result.resolved
     assert resolved is not None
     lines = [resolved.summary]
@@ -138,40 +147,64 @@ def format_structured(result: AgentResult) -> list[str]:
     lines += [f"Caveat: {caveat}" for caveat in resolved.caveats]
     lines += ["", "values:"]
     if resolved.values:
-        rows = [["id", "value", "tool", "path", "as_of"]]
-        rows += [[v.id, v.formatted, v.tool, v.path, v.as_of or "-"] for v in resolved.values]
+        rows = [["id", "value", "call", "tool", "path", "as_of"]]
+        rows += [[v.id, v.formatted, v.call_ref, v.tool, v.path, v.as_of or "-"]
+                 for v in resolved.values]  # fmt: skip
         lines += _table(rows)
     else:
         lines.append("  (none)")
     if resolved.unused_values:
         lines.append("unused values: " + ", ".join(resolved.unused_values))
-    if resolved.errors:
-        lines.append("resolution errors:")
-        lines += [f"  {e.value_id or '-'}: {e.code} - {e.message}" for e in resolved.errors]
     return [*lines, ""]
+
+
+def format_guard(result: AgentResult) -> list[str]:
+    """Verification outcome, guard metrics and the reasons for each rejected attempt."""
+    verified = "yes" if result.verified else f"no ({result.refusal_reason or result.stop_reason})"
+    lines = [
+        f"verified: {verified}",
+        f"guard: attempts={result.guard_attempts} rejections={result.guard_rejections}",
+    ]
+    for i, reasons in enumerate(result.rejected_reasons, 1):
+        lines.append(f"  rejected attempt {i}:")
+        lines += [f"    - {reason}" for reason in reasons]
+    return lines
+
+
+def _usage_line(label: str, u: Any, latency_ms: float) -> str:
+    return (
+        f"{label}: prompt={u.prompt_tokens} completion={u.completion_tokens} "
+        f"reasoning={u.reasoning_tokens} total={u.total_tokens}  {latency_ms / 1000:.2f} s"
+    )
 
 
 def format_report(
     result: AgentResult, prices: tuple[float, float] | None, *, structured: bool = False
 ) -> list[str]:
-    """The answer and run statistics. ``structured`` shows the resolved structured answer
-    instead of the plain one, or a note and the plain answer if the structured phase failed."""
+    """The answer and run statistics. ``structured`` shows the verified answer with its
+    values, or the refusal, plus guard metrics and usage per phase."""
     u = result.usage
-    if structured and result.resolved is not None:
+    if structured and result.verified:
         lines = format_structured(result)
     else:
-        lines = []
-        if structured and result.stop_reason == "final":
-            lines = ["(no structured answer: structured_failed; plain answer below)", ""]
         answer = result.answer
-        lines += [answer if answer is not None else "(no answer: the response was cut off)", ""]
+        lines = [answer if answer is not None else "(no answer: the response was cut off)", ""]
+    if structured:
+        lines += format_guard(result)
     lines += [
         f"stop_reason: {result.stop_reason}",
         f"steps: {result.steps}  tool calls: {len(result.tool_calls)}",
-        f"tokens: prompt={u.prompt_tokens} completion={u.completion_tokens} "
-        f"reasoning={u.reasoning_tokens} total={u.total_tokens}",
-        f"latency: {result.latency_ms / 1000:.2f} s",
     ]
+    if structured:
+        lines.append("usage by phase:")
+        lines += [_usage_line(f"  {p.name}", p.usage, p.latency_ms) for p in result.phases]
+        lines.append(_usage_line("  total", u, result.latency_ms))
+    else:
+        lines += [
+            f"tokens: prompt={u.prompt_tokens} completion={u.completion_tokens} "
+            f"reasoning={u.reasoning_tokens} total={u.total_tokens}",
+            f"latency: {result.latency_ms / 1000:.2f} s",
+        ]
     if prices is not None:
         lines.append(f"estimated cost: ${estimate_cost(result, prices):.6f}")
     if result.warnings:
@@ -214,7 +247,8 @@ async def ask(args: argparse.Namespace, client: ChatClient, provider: DataProvid
         ctx=CallerContext(tier=args.tier),
         client=client,
         config=AgentConfig(reasoning_effort=args.effort),
-        structured=args.structured,
+        structured=args.structured or args.single_phase,
+        structured_mode="single_phase" if args.single_phase else "two_phase",
     )
 
 
@@ -268,8 +302,10 @@ def main(
             for line in format_tool_calls(result) or ["  (none)"]:
                 print(line, file=stdout)
             print("", file=stdout)
-        print("\n".join(format_report(result, prices, structured=args.structured)),
-              file=stdout)  # fmt: skip
+        structured = args.structured or args.single_phase
+        print("\n".join(format_report(result, prices, structured=structured)), file=stdout)
+    if (args.structured or args.single_phase) and not result.verified:
+        return 1
     return 0 if result.stop_reason == "final" else 1
 
 

@@ -5,25 +5,30 @@ model asks for (concurrently, each under its own timeout), feeds the results bac
 repeats until the model answers without tool calls or a limit is hit. It never raises
 for tool or model failures: they end up as structured tool errors or as a stop reason.
 
-With ``structured=True`` a second phase follows a final answer: one request without
-tools asks for the answer again as a ``StructuredAnswer`` (strict JSON schema), whose
-value pointers are then resolved against the tool results (see ``resolve.py``).
+With ``structured=True`` the answer is verified before it is returned (card 10). A
+second phase follows a final answer: one request without tools asks for the answer again
+as a ``StructuredAnswer`` (strict JSON schema). Its value pointers are resolved against
+the tool results (``resolve.py``) and the result is guarded (``guard.py``). A rejected
+answer gets one regeneration with a correction message; if that fails too, the run
+returns a fixed refusal without numbers, never the unverified phase A text.
 """
 
 import asyncio
 import json
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from pydantic import ValidationError
 
-from mirkaso_copilot.answer import StructuredAnswer, response_format
+from mirkaso_copilot.answer import MAX_CLAIMS, MAX_VALUES, StructuredAnswer, response_format
 from mirkaso_copilot.envelope import ErrorCode, error_result
+from mirkaso_copilot.guard import OutputGuard, check_answer
 from mirkaso_copilot.meta_client import REASONING_EFFORTS, describe_error, parse_usage
 from mirkaso_copilot.providers import CallerContext, DataProvider
-from mirkaso_copilot.resolve import ResolutionError, ResolvedAnswer, resolve_answer
+from mirkaso_copilot.resolve import ResolutionError, ResolvedAnswer, call_alias, resolve_answer
 from mirkaso_copilot.tools.registry import canonical_call, execute_tool, tool_definitions
 
 logger = logging.getLogger(__name__)
@@ -39,21 +44,50 @@ available on the user's plan. Never treat null as zero.
 - Give no investment advice: no buy or sell recommendations and no price predictions.
 - If the data needed to answer is not available through the tools, say so."""
 
-STRUCTURED_INSTRUCTION = """\
-Now give your answer again as JSON that matches the response schema. Use only the tool \
-results above.
+PLACEHOLDER_RULES = f"""\
 - Never write a number yourself. Wherever a number, price, percentage, ratio, count or \
-time goes, in summary, claims and caveats alike, write a placeholder such as {v1} and add \
-one entry with that id to values. Digits may appear in the text only as part of \
-timeframes such as 1h, 4h, 24h, 7d and in asset or sector names.
-- Each value points into one tool result above: tool_call_id is the id of the tool call \
-that returned it, and path is a JSON Pointer into that result exactly as it was returned, \
-e.g. /data/sectors/0/sector_score, /data/summary/total_usd or /as_of.
+time goes, in summary, claims and caveats alike, write a placeholder such as {{v1}} and \
+add one entry with that id to values. Digits may appear in the text only in timeframes \
+written as 15m, 1h, 4h, 24h, 7d or 30d and in asset or sector names.
+- Each value points into one tool result: call_ref is the alias of the call that \
+returned it (t1, t2, ...), and path is a JSON Pointer into that result exactly as it was \
+returned, e.g. /data/sectors/0/sector_score, /data/summary/total_usd or /as_of.
 - kind: usd for US dollar amounts, percent for fields that already are percentages \
 (names ending in _pct), ratio for ratios, count for numbers of items, timestamp for \
 times, number for any other number, text for strings such as a regime label. Set \
 decimals to null unless a specific precision matters.
-- Do not point at results that are errors."""
+- Do not point at results that are errors.
+- Be concise: at most {MAX_CLAIMS} claims and at most {MAX_VALUES} values, short sentences.
+- Describe the data only: no advice, recommendations or predictions."""
+
+STRUCTURED_INSTRUCTION = f"""\
+Now give your answer again as JSON that matches the response schema. Use only the tool \
+results above.
+{PLACEHOLDER_RULES}"""
+
+# Appended to the system prompt in single-phase mode, where no call list can be shown.
+SINGLE_PHASE_RULES = f"""
+
+When you answer without calling tools, answer as JSON that matches the response schema.
+{PLACEHOLDER_RULES}
+- Your tool calls are numbered t1, t2, ... in the order you made them across the whole \
+conversation: the first call of your first request is t1."""
+
+CORRECTION_INTRO = "Your previous answer was rejected for these problems:"
+CORRECTION_OUTRO = (
+    "Fix them and give the complete answer again as JSON that matches the response "
+    "schema, following the same rules."
+)
+MAX_CORRECTION_LINES = 12
+LENGTH_PROBLEM = "the reply was cut off at the length limit; write fewer, shorter claims"
+
+MAX_STRUCTURED_ATTEMPTS = 2
+STRUCTURED_MODES = ("two_phase", "single_phase")
+# Contains no number, so a refusal can never carry an unverified value.
+REFUSAL_ANSWER = (
+    "I couldn't produce a verified answer for this question. "
+    "Please try again or ask more specifically."
+)
 
 FALLBACK_ANSWERS: dict[str, str] = {
     "max_steps": "I could not finish answering within the allowed number of steps. "
@@ -86,6 +120,8 @@ class AgentConfig:
     max_tool_calls_total: int = 12
     # Reasoning tokens count toward completion tokens: small values truncate answers.
     request_max_tokens: int = 3000
+    # The structured reply is long JSON and reasoning counts toward it.
+    structured_max_tokens: int = 6000
     reasoning_effort: str = "low"
     total_timeout_s: float = 90.0
     per_tool_timeout_s: float = 15.0
@@ -96,7 +132,8 @@ class AgentConfig:
         if self.reasoning_effort not in REASONING_EFFORTS:
             raise ValueError(f"reasoning_effort must be one of {sorted(REASONING_EFFORTS)}")
         for name in ("max_steps", "max_tool_calls_total", "request_max_tokens",
-                     "total_timeout_s", "per_tool_timeout_s", "max_total_tokens"):  # fmt: skip
+                     "structured_max_tokens", "total_timeout_s", "per_tool_timeout_s",
+                     "max_total_tokens"):  # fmt: skip
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
 
@@ -118,6 +155,15 @@ class AgentUsage:
         self.total_tokens += (
             usage.total_tokens if usage.total_tokens is not None else prompt + completion
         )
+
+
+@dataclass(slots=True)
+class PhaseStats:
+    """Usage and wall time of one phase: ``tool``, ``structured_1``, ``structured_2``."""
+
+    name: str
+    usage: AgentUsage = field(default_factory=AgentUsage)
+    latency_ms: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,10 +192,19 @@ class AgentResult:
     # Opt-in diagnostics, one dict per warning that has details (see
     # ``meta_client.describe_error``). Never sent to the model and never logged.
     warnings_detail: list[dict[str, Any]] = field(default_factory=list)
-    # Set only by a structured run (``run_agent(..., structured=True)``).
+    # Usage and latency per phase; ``usage`` and ``latency_ms`` are the totals.
+    phases: list[PhaseStats] = field(default_factory=list)
+    # Set only by a structured run (``run_agent(..., structured=True)``). ``structured``
+    # and ``resolved`` are set only for a verified answer; ``resolution_errors`` are those
+    # of the last attempt, for diagnostics.
+    verified: bool | None = None
+    refusal_reason: str | None = None
     structured: StructuredAnswer | None = None
     resolved: ResolvedAnswer | None = None
     resolution_errors: list[ResolutionError] = field(default_factory=list)
+    guard_attempts: int = 0
+    guard_rejections: int = 0
+    rejected_reasons: list[list[str]] = field(default_factory=list)  # one list per rejection
 
 
 class _Stop(Exception):
@@ -159,6 +214,34 @@ class _Stop(Exception):
         self.reason = reason
         self.warning = warning
         self.detail = detail
+
+
+def structured_instruction(records: Sequence[ToolCallRecord]) -> str:
+    """The phase B instruction, ending with every executed call and its alias."""
+    lines = [STRUCTURED_INSTRUCTION, "", "Tool calls, by alias (use the alias as call_ref):"]
+    for i, r in enumerate(records):
+        args = json.dumps(r.args, sort_keys=True) if r.args is not None else "invalid arguments"
+        ok = f"ok, source {r.source_id}, as_of {r.as_of}"
+        status = ok if r.ok else f"error {r.error_code}"
+        lines.append(f"{call_alias(i)} = {r.name}({args}) {status}")
+    return "\n".join(lines)
+
+
+def correction_message(problems: Sequence[str]) -> str:
+    shown = list(problems[:MAX_CORRECTION_LINES])
+    if len(problems) > len(shown):
+        shown.append(f"... and {len(problems) - len(shown)} more")
+    return "\n".join([CORRECTION_INTRO, *(f"- {p}" for p in shown), CORRECTION_OUTRO])
+
+
+def _validation_problems(exc: ValidationError) -> list[str]:
+    """Location and message of each error; the reply text itself is never included."""
+    problems = []
+    for err in exc.errors(include_input=False, include_url=False)[:8]:
+        loc = ".".join(str(part) for part in err["loc"])
+        problems.append(f"invalid answer: {loc}: {err['msg']}" if loc else
+                        f"invalid answer: {err['msg']}")  # fmt: skip
+    return problems
 
 
 def _parse_args(raw: Any) -> dict[str, Any] | None:
@@ -181,13 +264,19 @@ class _Run:
         ctx: CallerContext,
         client: ChatClient,
         config: AgentConfig,
+        *,
+        single_phase: bool = False,
+        output_guard: OutputGuard | None = None,
     ) -> None:
         self.provider = provider
         self.ctx = ctx
         self.client = client
         self.config = config
+        self.single_phase = single_phase
+        self.output_guard = output_guard
+        system = config.system_prompt + (SINGLE_PHASE_RULES if single_phase else "")
         self.messages: list[dict[str, Any]] = [
-            {"role": "system", "content": config.system_prompt},
+            {"role": "system", "content": system},
             {"role": "user", "content": question},
         ]
         self.steps = 0
@@ -196,9 +285,38 @@ class _Run:
         self.seen: set[tuple[str, str]] = set()
         self.warnings: list[str] = []
         self.warnings_detail: list[dict[str, Any]] = []
+        self.phases: list[PhaseStats] = []
+        self.phase = PhaseStats("tool")
+        self._phase_start = time.perf_counter()
+        # Structured verification state.
+        self.verified = False
+        self.refusal_reason: str | None = None
+        self.structured: StructuredAnswer | None = None
+        self.resolved: ResolvedAnswer | None = None
+        self.resolution_errors: list[ResolutionError] = []
+        self.guard_attempts = 0
+        self.rejected_reasons: list[list[str]] = []
+
+    def start_phase(self, name: str) -> None:
+        self.phase = PhaseStats(name)
+        self.phases.append(self.phase)
+        self._phase_start = time.perf_counter()
+
+    def end_phase(self) -> None:
+        self.phase.latency_ms = round((time.perf_counter() - self._phase_start) * 1000, 1)
+
+    def _add_usage(self, body: dict[str, Any]) -> None:
+        self.usage.add(body)
+        self.phase.usage.add(body)
 
     async def loop(self) -> str:
         tools = tool_definitions()
+        # Single-phase experiment: the schema goes with every request of the loop.
+        extra: dict[str, Any] = {}
+        max_tokens = self.config.request_max_tokens
+        if self.single_phase:
+            extra["response_format"] = response_format()
+            max_tokens = self.config.structured_max_tokens
         while True:
             self.steps += 1
             try:
@@ -207,7 +325,8 @@ class _Run:
                     tools=tools,
                     tool_choice="auto",
                     reasoning_effort=self.config.reasoning_effort,
-                    max_tokens=self.config.request_max_tokens,
+                    max_tokens=max_tokens,
+                    **extra,
                 )
                 choice = body["choices"][0]
                 message = choice["message"]
@@ -215,7 +334,7 @@ class _Run:
                 logger.warning("agent step %d: model request failed (%s)", self.steps,
                                type(exc).__name__)  # fmt: skip
                 raise _Stop("error", "model_request_failed", describe_error(exc)) from None
-            self.usage.add(body)
+            self._add_usage(body)
 
             if choice.get("finish_reason") == "length":
                 raise _Stop("truncated", "finish_reason_length")
@@ -331,44 +450,84 @@ class _Run:
                 result = error_result(ErrorCode.INTERNAL_ERROR)
         return await self._finish(call_id, name, args, result, (time.perf_counter() - start) * 1000)
 
-    async def structure(self) -> StructuredAnswer | None:
-        """Phase B: one request without tools for the answer as a ``StructuredAnswer``.
+    async def verify(self, final_content: str) -> None:
+        """Get a structured answer that resolves and passes the guard, in at most two
+        attempts. Sets ``verified`` or ``refusal_reason``.
 
-        Returns None (with warning ``structured_failed``) if the request fails or is cut
-        off, or if the reply is not valid JSON for the schema.
+        In single-phase mode the loop's final message is the first attempt; otherwise each
+        attempt is one request without tools, with the strict ``response_format``.
         """
-        self.messages.append({"role": "user", "content": STRUCTURED_INSTRUCTION})
+        problems: list[str] = []
+        for attempt in range(1, MAX_STRUCTURED_ATTEMPTS + 1):
+            if attempt == 1 and self.single_phase:
+                reply: tuple[Any, Any] | None = (final_content, "stop")
+            else:
+                self.start_phase(f"structured_{attempt}")
+                try:
+                    reply = await self._structured_request(attempt, problems)
+                finally:
+                    self.end_phase()
+            if reply is None:
+                self.refusal_reason = "structured_request_failed"
+                return
+            self.guard_attempts += 1
+            problems, failure = self._evaluate(*reply)
+            if not problems:
+                self.verified = True
+                self.refusal_reason = None
+                return
+            self.rejected_reasons.append(problems)
+            self.refusal_reason = failure
+            logger.info("agent structured attempt %d rejected: %s", attempt, failure)
+
+    async def _structured_request(
+        self, attempt: int, problems: Sequence[str]
+    ) -> tuple[Any, Any] | None:
+        """One structured request; ``(content, finish_reason)``, or None if it failed."""
+        if attempt == 1:
+            prompt = structured_instruction(self.records)
+        elif self.single_phase:
+            # The call list was never shown in single-phase mode.
+            prompt = structured_instruction(self.records) + "\n\n" + correction_message(problems)
+        else:
+            prompt = correction_message(problems)
+        self.messages.append({"role": "user", "content": prompt})
         try:
             body = await self.client.chat(
                 self.messages,
                 response_format=response_format(),
                 reasoning_effort=self.config.reasoning_effort,
-                max_tokens=self.config.request_max_tokens,
+                max_tokens=self.config.structured_max_tokens,
             )
             choice = body["choices"][0]
             content = choice["message"].get("content")
         except Exception as exc:
-            logger.warning("agent structured phase: model request failed (%s)",
+            logger.warning("agent structured attempt %d: model request failed (%s)", attempt,
                            type(exc).__name__)  # fmt: skip
-            self._structured_failed(describe_error(exc))
+            self.warnings.append("structured_failed")
+            self.warnings_detail.append({"warning": "structured_failed", **describe_error(exc)})
             return None
-        self.usage.add(body)
+        self._add_usage(body)
         self.messages.append({"role": "assistant", "content": content})
-        if choice.get("finish_reason") == "length" or not isinstance(content, str):
-            self._structured_failed()
-            return None
-        try:
-            return StructuredAnswer.model_validate_json(content)
-        except ValidationError:
-            # Invalid JSON is a ValidationError too; its text is not logged.
-            logger.warning("agent structured phase: reply does not match the schema")
-            self._structured_failed()
-            return None
+        return content, choice.get("finish_reason")
 
-    def _structured_failed(self, detail: dict[str, Any] | None = None) -> None:
-        self.warnings.append("structured_failed")
-        if detail is not None:
-            self.warnings_detail.append({"warning": "structured_failed", **detail})
+    def _evaluate(self, content: Any, finish_reason: Any) -> tuple[list[str], str | None]:
+        """``(problems, refusal_reason)`` for one reply; no problems means verified."""
+        if finish_reason == "length":
+            return [LENGTH_PROBLEM], "structured_length"
+        if not isinstance(content, str) or not content.strip():
+            return ["the reply was empty; reply with the JSON object"], "structured_invalid"
+        try:
+            answer = StructuredAnswer.model_validate_json(content)
+        except ValidationError as exc:
+            return _validation_problems(exc), "structured_invalid"
+        resolved = resolve_answer(answer, self.records, self.messages)
+        self.resolution_errors = list(resolved.errors)
+        guard = check_answer(answer, resolved, output_guard=self.output_guard)
+        if not guard.ok:
+            return guard.problems(), "guard_failed"
+        self.structured, self.resolved = answer, resolved
+        return [], None
 
 
 async def run_agent(
@@ -379,18 +538,33 @@ async def run_agent(
     client: ChatClient,
     config: AgentConfig | None = None,
     structured: bool = False,
+    structured_mode: str = "two_phase",
+    output_guard: OutputGuard | None = None,
 ) -> AgentResult:
-    """Run the tool loop; with ``structured=True`` also produce a resolved structured answer.
+    """Run the tool loop; with ``structured=True`` return only a verified answer.
 
-    The structured phase runs only after a final answer, within what is left of
-    ``total_timeout_s``. Its usage and latency count toward the run's totals; it does not
-    count as a step. If it fails, ``stop_reason`` stays ``final`` and ``structured`` is
-    None, with warning ``structured_failed``.
+    Verification runs only after a final answer, within what is left of
+    ``total_timeout_s``, and does not count as a step; its usage and latency count toward
+    the totals and appear per phase in ``phases``. ``stop_reason`` stays ``final`` either
+    way. A verified answer sets ``verified=True`` and ``answer`` to the rendered
+    structured text. Otherwise ``verified=False``, ``refusal_reason`` says why and
+    ``answer`` is ``REFUSAL_ANSWER``.
+
+    ``structured_mode="single_phase"`` is an experiment: the schema is sent with every
+    request of the tool loop and the final message is parsed as the structured answer.
+    ``output_guard`` replaces the default advice check (see ``guard.check_answer``).
     """
+    if structured_mode not in STRUCTURED_MODES:
+        raise ValueError(f"structured_mode must be one of {STRUCTURED_MODES}")
     config = config or AgentConfig()
-    run = _Run(question, provider, ctx, client, config)
+    run = _Run(
+        question, provider, ctx, client, config,
+        single_phase=structured and structured_mode == "single_phase",
+        output_guard=output_guard,
+    )  # fmt: skip
     start = time.perf_counter()
     answer: str | None = None
+    run.start_phase("tool")
     try:
         async with asyncio.timeout(config.total_timeout_s):
             answer = await run.loop()
@@ -403,20 +577,25 @@ async def run_agent(
                 run.warnings_detail.append({"warning": stop.warning, **stop.detail})
     except TimeoutError:
         stop_reason = "timeout"
+    finally:
+        run.end_phase()
     if stop_reason not in ("final", "truncated"):
         answer = FALLBACK_ANSWERS[stop_reason]
 
-    structured_answer: StructuredAnswer | None = None
-    resolved: ResolvedAnswer | None = None
     if structured and stop_reason == "final":
         remaining = config.total_timeout_s - (time.perf_counter() - start)
         try:
             async with asyncio.timeout(max(remaining, 0)):
-                structured_answer = await run.structure()
+                await run.verify(answer or "")
         except TimeoutError:
-            run.warnings.append("structured_failed")
-        if structured_answer is not None:
-            resolved = resolve_answer(structured_answer, run.records, run.messages)
+            run.verified, run.refusal_reason = False, "timeout"
+        # Never the unverified phase A text: only the resolved answer or the refusal.
+        if run.verified and run.resolved is not None:
+            answer = run.resolved.text
+        else:
+            run.verified = False
+            run.structured = run.resolved = None
+            answer = REFUSAL_ANSWER
 
     result = AgentResult(
         answer=answer,
@@ -428,10 +607,23 @@ async def run_agent(
         messages=run.messages,
         warnings=run.warnings,
         warnings_detail=run.warnings_detail,
-        structured=structured_answer,
-        resolved=resolved,
-        resolution_errors=list(resolved.errors) if resolved is not None else [],
+        phases=run.phases,
     )
+    if structured:
+        result.verified = run.verified
+        result.refusal_reason = run.refusal_reason
+        result.structured = run.structured
+        result.resolved = run.resolved
+        result.resolution_errors = run.resolution_errors
+        result.guard_attempts = run.guard_attempts
+        result.guard_rejections = len(run.rejected_reasons)
+        result.rejected_reasons = run.rejected_reasons
+        logger.info(
+            "agent structured verified=%s refusal_reason=%s guard_attempts=%d "
+            "guard_rejections=%d",
+            result.verified, result.refusal_reason, result.guard_attempts,
+            result.guard_rejections,
+        )  # fmt: skip
     logger.info(
         "agent run stop_reason=%s steps=%d tool_calls=%d prompt_tokens=%d "
         "completion_tokens=%d reasoning_tokens=%d total_tokens=%d latency_ms=%.1f",
