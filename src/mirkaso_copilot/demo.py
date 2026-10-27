@@ -3,13 +3,14 @@
 Usage::
 
     mirkaso-copilot-demo "Which sectors are strongest right now?" [--tier trader]
-        [--effort low] [--json] [--show-tools] [--fixed-time] [--verbose]
+        [--effort low] [--json] [--show-tools] [--fixed-time] [--verbose] [--structured]
 
 Reads ``META_API_KEY`` and ``META_MODEL`` (both required) and ``META_API_BASE``
 (optional) from the environment. The key is never printed. If ``META_PRICE_IN_PER_M``
 and ``META_PRICE_OUT_PER_M`` (USD per million prompt / completion tokens) are set, an
 estimated cost is printed too. All market data is synthetic demo data, shifted to the
-current time unless ``--fixed-time`` is given.
+current time unless ``--fixed-time`` is given. ``--structured`` adds the second phase
+that asks for a structured answer and resolves its values against the tool results.
 
 Exit status: 0 when the model gave a final answer, 1 for any other stop reason,
 2 for configuration errors.
@@ -72,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbose", action="store_true",
         help="On a failed model request, print the HTTP status and the API's error message.",
     )  # fmt: skip
+    parser.add_argument(
+        "--structured", action="store_true",
+        help="Ask for a structured answer whose numbers the server resolves from the tool "
+        "results, and print it with a table of the resolved values.",
+    )  # fmt: skip
     return parser
 
 
@@ -117,11 +123,49 @@ def format_tool_calls(result: AgentResult) -> list[str]:
     return lines
 
 
-def format_report(result: AgentResult, prices: tuple[float, float] | None) -> list[str]:
+def _table(rows: list[list[str]]) -> list[str]:
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    return ["  " + "  ".join(c.ljust(w) for c, w in zip(row, widths, strict=True)).rstrip()
+            for row in rows]  # fmt: skip
+
+
+def format_structured(result: AgentResult) -> list[str]:
+    """The resolved summary, claims and caveats, then the values table and any errors."""
+    resolved = result.resolved
+    assert resolved is not None
+    lines = [resolved.summary]
+    lines += [f"- {claim}" for claim in resolved.claims]
+    lines += [f"Caveat: {caveat}" for caveat in resolved.caveats]
+    lines += ["", "values:"]
+    if resolved.values:
+        rows = [["id", "value", "tool", "path", "as_of"]]
+        rows += [[v.id, v.formatted, v.tool, v.path, v.as_of or "-"] for v in resolved.values]
+        lines += _table(rows)
+    else:
+        lines.append("  (none)")
+    if resolved.unused_values:
+        lines.append("unused values: " + ", ".join(resolved.unused_values))
+    if resolved.errors:
+        lines.append("resolution errors:")
+        lines += [f"  {e.value_id or '-'}: {e.code} - {e.message}" for e in resolved.errors]
+    return [*lines, ""]
+
+
+def format_report(
+    result: AgentResult, prices: tuple[float, float] | None, *, structured: bool = False
+) -> list[str]:
+    """The answer and run statistics. ``structured`` shows the resolved structured answer
+    instead of the plain one, or a note and the plain answer if the structured phase failed."""
     u = result.usage
-    lines = [
-        result.answer if result.answer is not None else "(no answer: the response was cut off)",
-        "",
+    if structured and result.resolved is not None:
+        lines = format_structured(result)
+    else:
+        lines = []
+        if structured and result.stop_reason == "final":
+            lines = ["(no structured answer: structured_failed; plain answer below)", ""]
+        answer = result.answer
+        lines += [answer if answer is not None else "(no answer: the response was cut off)", ""]
+    lines += [
         f"stop_reason: {result.stop_reason}",
         f"steps: {result.steps}  tool calls: {len(result.tool_calls)}",
         f"tokens: prompt={u.prompt_tokens} completion={u.completion_tokens} "
@@ -155,6 +199,7 @@ def result_json(
     result: AgentResult, prices: tuple[float, float] | None, *, verbose: bool
 ) -> dict[str, Any]:
     out = asdict(result)
+    out["structured"] = result.structured.model_dump() if result.structured else None
     if not verbose:
         del out["warnings_detail"]
     if prices is not None:
@@ -169,6 +214,7 @@ async def ask(args: argparse.Namespace, client: ChatClient, provider: DataProvid
         ctx=CallerContext(tier=args.tier),
         client=client,
         config=AgentConfig(reasoning_effort=args.effort),
+        structured=args.structured,
     )
 
 
@@ -222,7 +268,8 @@ def main(
             for line in format_tool_calls(result) or ["  (none)"]:
                 print(line, file=stdout)
             print("", file=stdout)
-        print("\n".join(format_report(result, prices)), file=stdout)
+        print("\n".join(format_report(result, prices, structured=args.structured)),
+              file=stdout)  # fmt: skip
     return 0 if result.stop_reason == "final" else 1
 
 

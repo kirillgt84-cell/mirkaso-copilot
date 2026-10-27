@@ -18,13 +18,14 @@ from mirkaso_copilot.tools._common import (
 NAME = "macro_get_regime"
 SOURCE_ID = "mirkaso.macro"
 DESCRIPTION = (
-    "Get the current market risk regime: a score from 0 to 100 and its band "
-    "(Panic <20, Risk OFF 20-35, Cautious 35-50, Neutral 50-65, Risk ON 65-80, "
-    "Strong Risk ON 80-100). panic_override=true forces the regime to Panic regardless "
+    "Get the current market risk regime: a score and its regime band. The result lists "
+    "every band in bands with its label and score range (min inclusive, max exclusive "
+    "except for the top band). panic_override=true forces the regime to Panic regardless "
     "of the score. Set include_history=true for up to 48 points over history_days days."
 )
 
 PANIC = "Panic"
+SCORE_MAX = 100
 # (lower bound inclusive, label), checked from the top down.
 REGIME_BANDS = (
     (80, "Strong Risk ON"),
@@ -41,6 +42,16 @@ class Params(BaseModel):
 
     include_history: bool = Field(False, description="Also return the regime history.")
     history_days: int = Field(7, ge=1, le=30, description="History window in days (1-30).")
+
+
+def regime_bands() -> list[dict[str, Any]]:
+    """The bands in ascending order: ``{label, min, max}``; ``max`` is the next band's min."""
+    ascending = sorted(REGIME_BANDS)
+    uppers = [lower for lower, _ in ascending[1:]] + [SCORE_MAX]
+    return [
+        {"label": label, "min": lower, "max": upper}
+        for (lower, label), upper in zip(ascending, uppers, strict=True)
+    ]
 
 
 def regime_for_score(score: float, panic_override: bool = False) -> str:
@@ -90,6 +101,7 @@ async def execute(provider: DataProvider, ctx: CallerContext, params: Params) ->
         "score": score,
         "regime": regime_for_score(score, panic),
         "panic_override": panic,
+        "bands": regime_bands(),
     }
     if params.include_history:
         history = await provider.macro_regime_history(days=params.history_days)

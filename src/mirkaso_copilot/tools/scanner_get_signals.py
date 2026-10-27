@@ -13,7 +13,8 @@ NAME = "scanner_get_signals"
 SOURCE_ID = "mirkaso.scanner"
 DESCRIPTION = (
     "List the strongest current market-scanner signals for crypto perpetual futures. "
-    "Each signal has a direction (LONG or SHORT), a score from 0 to 13 (higher is stronger), "
+    "Each signal has a direction (LONG or SHORT), a score (higher is stronger; the result's "
+    "score_max is the highest possible score), "
     "a confidence level and price_change_1h_pct, the price move over the last 1 hour "
     "(never a 24-hour move). If the result has gated=true, the fields named in gated_fields "
     "are hidden on the user's plan: masked symbols appear as '***', price is a range label, "
@@ -40,6 +41,7 @@ SIGNAL_FIELDS = (
 NULLED_FIELDS = ("volume_ratio", "oi_change_pct", "price_change_1h_pct", "quote_volume_24h")
 GATED_FIELDS = ("symbol", "base_asset", "price", *NULLED_FIELDS)
 BASE_ASSET_FILTER_FIELD = "base_asset_filter"
+SCORE_MAX = 13
 
 _PRICE_BUCKETS = (
     (0.01, "<0.01"),
@@ -56,7 +58,7 @@ _PRICE_BUCKETS = (
 class Params(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    min_score: int = Field(8, ge=0, le=13, description="Minimum signal score (0-13).")
+    min_score: int = Field(8, ge=0, le=SCORE_MAX, description="Minimum signal score (0-13).")
     direction: Literal["LONG", "SHORT"] | None = Field(None, description="Only this direction.")
     confidence: Literal["high", "medium", "low"] | None = Field(
         None, description="Only this confidence level."
@@ -120,7 +122,7 @@ async def execute(provider: DataProvider, ctx: CallerContext, params: Params) ->
             source_id=SOURCE_ID,
             gated=True,
             gated_fields=[BASE_ASSET_FILTER_FIELD, *GATED_FIELDS],
-            data={"signals": []},
+            data={"signals": [], "score_max": SCORE_MAX},
         )
 
     payload = await provider.scanner_signals(
@@ -136,5 +138,5 @@ async def execute(provider: DataProvider, ctx: CallerContext, params: Params) ->
         source_id=SOURCE_ID,
         gated=gated,
         gated_fields=gated_fields,
-        data={"signals": signals},
+        data={"signals": signals, "score_max": SCORE_MAX},
     )

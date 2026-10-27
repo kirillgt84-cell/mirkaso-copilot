@@ -3,6 +3,12 @@
 Five tools are exposed to the model. Parameter caps are enforced by the JSON schema
 (`additionalProperties: false`) and again by server-side validation.
 
+Tool descriptions state no data numbers (thresholds, scales, band ranges): only
+timeframes such as `1h` or `24h` and caps on what a call may return. Every number an
+answer may cite is in a tool result, where a structured answer can point at it with a
+JSON Pointer (see [Structured answers](../README.md#structured-answers)). A test checks
+the descriptions for this.
+
 ## Result envelope
 
 Every successful call returns:
@@ -41,6 +47,9 @@ Current market-scanner signals for crypto perpetual futures.
 `price_change_1h_pct` (1-hour move, never 24h), `volume_ratio`, `oi_change_pct`,
 `quote_volume_24h`, `detected_at`.
 
+`data.score_max`: the highest possible signal score (13); scores start at 0. It is
+present in every result, including an empty or gated one.
+
 Gating:
 - **trader and above**: full fidelity.
 - **below trader**: `gated=true`. `symbol`/`base_asset` are masked as `***` except for
@@ -71,18 +80,23 @@ visible to **starter and above**.
 | `include_history` | bool | false | |
 | `history_days` | integer | 7 | 1–30 |
 
-`data`: `score` (0–100), `regime`, `panic_override`, and `history[]` when requested.
+`data`: `score` (0–100), `regime`, `panic_override`, `bands[]`, and `history[]` when
+requested.
 
-| Score | Regime |
-|---|---|
-| < 20 | Panic |
-| 20–35 | Risk OFF |
-| 35–50 | Cautious |
-| 50–65 | Neutral |
-| 65–80 | Risk ON |
-| 80–100 | Strong Risk ON |
+`bands[]` lists every regime band in ascending order as `{label, min, max}`, so an
+answer can cite a band's range from the data:
 
-Lower bounds are inclusive. `panic_override=true` forces `Panic` regardless of score.
+| `label` | `min` | `max` |
+|---|---|---|
+| Panic | 0 | 20 |
+| Risk OFF | 20 | 35 |
+| Cautious | 35 | 50 |
+| Neutral | 50 | 65 |
+| Risk ON | 65 | 80 |
+| Strong Risk ON | 80 | 100 |
+
+`min` is inclusive and `max` exclusive, except for the top band, which includes 100.
+`panic_override=true` forces `Panic` regardless of score.
 
 History is rebucketed to at most 48 time-ordered points. Each point has `ts` (latest
 in the bucket), `score` (the bucket average, 2 decimals), `regime` (the latest row's

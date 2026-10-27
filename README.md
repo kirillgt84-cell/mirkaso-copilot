@@ -29,6 +29,7 @@ mirkaso-copilot-demo "How much was liquidated in the last 24h?" --effort medium
 mirkaso-copilot-demo "What are the top scanner signals?" --tier guest --json
 mirkaso-copilot-demo "Is the macro regime improving?" --fixed-time   # stored 2026-10-26 times
 mirkaso-copilot-demo "Any unusual BTC activity?" --verbose           # show why a request failed
+mirkaso-copilot-demo "How much was liquidated in the last 24h?" --structured  # server-resolved numbers
 ```
 
 `python -m mirkaso_copilot.demo ...` works the same way.
@@ -40,6 +41,7 @@ mirkaso-copilot-demo "Any unusual BTC activity?" --verbose           # show why 
 | `--show-tools` | off | Print each tool call with its arguments, `ok` or error code, and latency |
 | `--json` | off | Print the full `AgentResult` as JSON: tool call records, usage, warnings and transcript |
 | `--fixed-time` | off | Keep the stored timestamps (base time `2026-10-26T12:00:00Z`) instead of shifting them to now |
+| `--structured` | off | Ask for a [structured answer](#structured-answers) after the tool loop and print its resolved summary and claims, a table of the resolved values (id, value, tool, path, `as_of`) and any resolution errors. One extra model request. With `--json`, `structured`, `resolved` and `resolution_errors` are filled in. |
 | `--verbose` | off | If a model request fails, print the HTTP status and the first 200 characters of the API's error message to stderr (only the error type for connection errors). The key and request headers are never printed. |
 
 What to expect: the model calls one or more tools (several in parallel when the question
@@ -129,8 +131,8 @@ JSON object, an unknown tool, or a repeat of the same tool with the same validat
 come back to the model as a structured error (`{"error": {"code", "message"}}`), so it
 can recover or explain.
 
-`AgentResult` carries `answer`, `stop_reason`, `steps`, a record per tool call (name,
-args, error code, latency, `source_id`, `as_of`), summed token usage including reasoning
+`AgentResult` carries `answer`, `stop_reason`, `steps`, a record per tool call (tool
+call id, name, args, error code, latency, `source_id`, `as_of`), summed token usage including reasoning
 tokens, total latency, `warnings` and the full message transcript. `warnings_detail`
 holds opt-in diagnostics for a failed model request (error type, HTTP status and at most
 200 characters of the API's error message); it is never sent to the model or logged.
@@ -145,9 +147,95 @@ holds opt-in diagnostics for a failed model request (error type, HTTP status and
 | `truncated` | The model hit `finish_reason: "length"` | `None` |
 | `error` | The model request failed or returned an empty answer | Fixed fallback text |
 
-Fallback texts contain no numbers. Structured answers and numeric grounding (checking
-every number in an answer against the tool results in the transcript) are separate
-modules that are coming next.
+Fallback texts contain no numbers.
+
+## Structured answers
+
+`run_agent(..., structured=True)` (demo: `--structured`) makes the numbers in an answer
+come from the server, not from the model. **The model never writes a number.** It writes
+prose with placeholders and, for each placeholder, a pointer to where the value is in a
+tool result. The server follows the pointer and substitutes the formatted value:
+
+```json
+{
+  "summary": "{v1} was liquidated in the last 24h, {v2} of it in longs.",
+  "claims": [{"text": "BTC led with {v3}."}],
+  "values": [
+    {"id": "v1", "tool_call_id": "call_1", "path": "/data/summary/total_usd", "kind": "usd", "decimals": null},
+    {"id": "v2", "tool_call_id": "call_1", "path": "/data/summary/long_pct", "kind": "percent", "decimals": null},
+    {"id": "v3", "tool_call_id": "call_1", "path": "/data/top_coins/0/total_usd", "kind": "usd", "decimals": null}
+  ],
+  "caveats": []
+}
+```
+
+renders as *"$56.87M was liquidated in the last 24h, 65.2% of it in longs."* and
+*"BTC led with $12.43M."*
+
+How it works:
+
+1. **Phase A** is the normal tool loop, unchanged.
+2. **Phase B**: after the final answer, one more request **without tools** and with
+   `response_format` set to the strict JSON schema of `StructuredAnswer`
+   ([`answer.py`](src/mirkaso_copilot/answer.py)). The schema is deliberately limited
+   to a subset that strict modes accept widely. Every object has
+   `additionalProperties: false` and requires all of its properties, `kind` is the only
+   enum, and nullable `decimals` is `"type": ["integer", "null"]`. There is no
+   `pattern`, `minimum`/`maximum` or `anyOf`/`oneOf`. The id format (`^v[0-9]{1,3}$`)
+   and the `decimals` range (0–6) are enforced by pydantic validators when the reply is
+   parsed. The request sends the whole transcript, so
+   the tool call ids and results the pointers refer to are in context, plus an
+   instruction with the placeholder rules. Every number, price, percentage, ratio,
+   count and time must be a placeholder. Digits may appear in the text only in
+   timeframes (`1h`, `24h`, `7d`) and in asset or sector names.
+3. **Resolution** ([`resolve.py`](src/mirkaso_copilot/resolve.py), a pure function).
+   Each `ValueRef` is looked up by `tool_call_id` and its RFC 6901 JSON Pointer is
+   followed into that call's result envelope, exactly as the model saw it. The value
+   must be a number, or a string for `text` and `timestamp`. It is then formatted for
+   its `kind`:
+
+   | `kind` | Example |
+   |---|---|
+   | `usd` | `$152.31`, `$420,000`; from one million on `$56.87M`, `$12.1B` |
+   | `percent` | `65.2%`; fields whose name contains `change` or `delta` get a sign: `+4.9%` |
+   | `ratio` | `1.41` |
+   | `count` | `6,114` (must be a whole number) |
+   | `number` | `54.3`, `0.000085`; also signed for `change`/`delta` fields |
+   | `timestamp` | `2026-10-26 12:00 UTC` |
+   | `text` | the string as is, e.g. `Neutral` |
+
+   `decimals` (0–6) overrides the default precision. For compact USD amounts it applies
+   to the shortened number (`$56.9M` with `decimals: 1`).
+
+`AgentResult` then carries `structured` (the parsed answer), `resolved` (rendered
+summary, claims and caveats, the full `text`, and every resolved value with its `value`,
+`formatted` text, `tool`, `source_id`, `as_of` and `path`) and `resolution_errors`.
+Phase B's tokens and time count toward the run's usage and latency. It does not count as
+a step.
+
+**Why this prevents invented numbers:** every number in the rendered text was read from
+a tool result by the server, and each one can be traced to its tool call, path and
+`as_of`. The model only chooses *which* value to cite. A wrong pointer gives an error,
+never a made-up number. All citable numbers must therefore be in the tool results.
+That is why the macro band ranges are a `bands` list in the result and not text in the
+tool description (see [docs/tools.md](docs/tools.md)).
+
+Failures never raise:
+
+- **Resolution errors** are returned as a typed list, so the caller can reject or
+  regenerate the answer: `unknown_placeholder`, `duplicate_value_id`,
+  `unknown_tool_call`, `tool_call_failed` (the pointer targets an error result),
+  `invalid_pointer`, `missing_path`, `wrong_type`. An unresolved placeholder stays
+  visible as `{v1}` in the rendered text. Values that no placeholder uses are allowed
+  and listed in `unused_values`.
+- **Phase B failure**: if the reply is not valid JSON for the schema, is cut off, or
+  the request fails, `stop_reason` stays `final`, `structured` is `None` and the
+  warning `structured_failed` is added. The phase A answer is still in `answer`.
+
+**Limit:** only placeholders are replaced. If the model ignores the rules and types a
+number into the text (say *"about $57M"*), the resolver leaves it as it is and does not
+flag it. A test pins this behaviour. Rejecting such answers is the job of the answer
+validator, which is the next module.
 
 ## Tiers
 

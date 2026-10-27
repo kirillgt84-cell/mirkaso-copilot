@@ -4,6 +4,10 @@
 model asks for (concurrently, each under its own timeout), feeds the results back and
 repeats until the model answers without tool calls or a limit is hit. It never raises
 for tool or model failures: they end up as structured tool errors or as a stop reason.
+
+With ``structured=True`` a second phase follows a final answer: one request without
+tools asks for the answer again as a ``StructuredAnswer`` (strict JSON schema), whose
+value pointers are then resolved against the tool results (see ``resolve.py``).
 """
 
 import asyncio
@@ -13,9 +17,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from pydantic import ValidationError
+
+from mirkaso_copilot.answer import StructuredAnswer, response_format
 from mirkaso_copilot.envelope import ErrorCode, error_result
 from mirkaso_copilot.meta_client import REASONING_EFFORTS, describe_error, parse_usage
 from mirkaso_copilot.providers import CallerContext, DataProvider
+from mirkaso_copilot.resolve import ResolutionError, ResolvedAnswer, resolve_answer
 from mirkaso_copilot.tools.registry import canonical_call, execute_tool, tool_definitions
 
 logger = logging.getLogger(__name__)
@@ -30,6 +38,22 @@ available on the user's plan. Never treat null as zero.
 - Mention the as_of time of the data you use.
 - Give no investment advice: no buy or sell recommendations and no price predictions.
 - If the data needed to answer is not available through the tools, say so."""
+
+STRUCTURED_INSTRUCTION = """\
+Now give your answer again as JSON that matches the response schema. Use only the tool \
+results above.
+- Never write a number yourself. Wherever a number, price, percentage, ratio, count or \
+time goes, in summary, claims and caveats alike, write a placeholder such as {v1} and add \
+one entry with that id to values. Digits may appear in the text only as part of \
+timeframes such as 1h, 4h, 24h, 7d and in asset or sector names.
+- Each value points into one tool result above: tool_call_id is the id of the tool call \
+that returned it, and path is a JSON Pointer into that result exactly as it was returned, \
+e.g. /data/sectors/0/sector_score, /data/summary/total_usd or /as_of.
+- kind: usd for US dollar amounts, percent for fields that already are percentages \
+(names ending in _pct), ratio for ratios, count for numbers of items, timestamp for \
+times, number for any other number, text for strings such as a regime label. Set \
+decimals to null unless a specific precision matters.
+- Do not point at results that are errors."""
 
 FALLBACK_ANSWERS: dict[str, str] = {
     "max_steps": "I could not finish answering within the allowed number of steps. "
@@ -50,6 +74,7 @@ class ChatClient(Protocol):
         *,
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
+        response_format: dict[str, Any] | None = None,
         reasoning_effort: str | None = None,
         max_tokens: int | None = None,
     ) -> dict[str, Any]: ...
@@ -98,6 +123,7 @@ class AgentUsage:
 @dataclass(frozen=True, slots=True)
 class ToolCallRecord:
     step: int
+    tool_call_id: str
     name: str
     args: dict[str, Any] | None  # None when the model sent arguments that are not a JSON object
     ok: bool
@@ -120,6 +146,10 @@ class AgentResult:
     # Opt-in diagnostics, one dict per warning that has details (see
     # ``meta_client.describe_error``). Never sent to the model and never logged.
     warnings_detail: list[dict[str, Any]] = field(default_factory=list)
+    # Set only by a structured run (``run_agent(..., structured=True)``).
+    structured: StructuredAnswer | None = None
+    resolved: ResolvedAnswer | None = None
+    resolution_errors: list[ResolutionError] = field(default_factory=list)
 
 
 class _Stop(Exception):
@@ -242,15 +272,24 @@ class _Run:
             canonical = canonical_call(name, args) if args is not None else None
             key = (name, canonical)
             if canonical is not None and key in self.seen:
-                aws.append(self._finish(name, args, error_result(ErrorCode.DUPLICATE_CALL), 0.0))
+                aws.append(
+                    self._finish(
+                        call["id"], name, args, error_result(ErrorCode.DUPLICATE_CALL), 0.0
+                    )
+                )
             else:
                 if canonical is not None:
                     self.seen.add(key)
-                aws.append(self._execute(name, args))
+                aws.append(self._execute(call["id"], name, args))
         return aws
 
     async def _finish(
-        self, name: str, args: dict[str, Any] | None, result: dict[str, Any] | Any, ms: float
+        self,
+        call_id: str,
+        name: str,
+        args: dict[str, Any] | None,
+        result: dict[str, Any] | Any,
+        ms: float,
     ) -> tuple[dict[str, Any], ToolCallRecord]:
         if not isinstance(result, dict):
             result = result.model_dump(mode="json")
@@ -258,6 +297,7 @@ class _Run:
         code = error.get("code") if isinstance(error, dict) else None
         record = ToolCallRecord(
             step=self.steps,
+            tool_call_id=call_id,
             name=name,
             args=args,
             ok=code is None,
@@ -273,7 +313,7 @@ class _Run:
         return result, record
 
     async def _execute(
-        self, name: str, args: dict[str, Any] | None
+        self, call_id: str, name: str, args: dict[str, Any] | None
     ) -> tuple[dict[str, Any], ToolCallRecord]:
         start = time.perf_counter()
         if args is None:
@@ -289,7 +329,46 @@ class _Run:
             except Exception as exc:
                 logger.warning("agent tool %s raised %s", name, type(exc).__name__)
                 result = error_result(ErrorCode.INTERNAL_ERROR)
-        return await self._finish(name, args, result, (time.perf_counter() - start) * 1000)
+        return await self._finish(call_id, name, args, result, (time.perf_counter() - start) * 1000)
+
+    async def structure(self) -> StructuredAnswer | None:
+        """Phase B: one request without tools for the answer as a ``StructuredAnswer``.
+
+        Returns None (with warning ``structured_failed``) if the request fails or is cut
+        off, or if the reply is not valid JSON for the schema.
+        """
+        self.messages.append({"role": "user", "content": STRUCTURED_INSTRUCTION})
+        try:
+            body = await self.client.chat(
+                self.messages,
+                response_format=response_format(),
+                reasoning_effort=self.config.reasoning_effort,
+                max_tokens=self.config.request_max_tokens,
+            )
+            choice = body["choices"][0]
+            content = choice["message"].get("content")
+        except Exception as exc:
+            logger.warning("agent structured phase: model request failed (%s)",
+                           type(exc).__name__)  # fmt: skip
+            self._structured_failed(describe_error(exc))
+            return None
+        self.usage.add(body)
+        self.messages.append({"role": "assistant", "content": content})
+        if choice.get("finish_reason") == "length" or not isinstance(content, str):
+            self._structured_failed()
+            return None
+        try:
+            return StructuredAnswer.model_validate_json(content)
+        except ValidationError:
+            # Invalid JSON is a ValidationError too; its text is not logged.
+            logger.warning("agent structured phase: reply does not match the schema")
+            self._structured_failed()
+            return None
+
+    def _structured_failed(self, detail: dict[str, Any] | None = None) -> None:
+        self.warnings.append("structured_failed")
+        if detail is not None:
+            self.warnings_detail.append({"warning": "structured_failed", **detail})
 
 
 async def run_agent(
@@ -299,7 +378,15 @@ async def run_agent(
     ctx: CallerContext,
     client: ChatClient,
     config: AgentConfig | None = None,
+    structured: bool = False,
 ) -> AgentResult:
+    """Run the tool loop; with ``structured=True`` also produce a resolved structured answer.
+
+    The structured phase runs only after a final answer, within what is left of
+    ``total_timeout_s``. Its usage and latency count toward the run's totals; it does not
+    count as a step. If it fails, ``stop_reason`` stays ``final`` and ``structured`` is
+    None, with warning ``structured_failed``.
+    """
     config = config or AgentConfig()
     run = _Run(question, provider, ctx, client, config)
     start = time.perf_counter()
@@ -319,6 +406,18 @@ async def run_agent(
     if stop_reason not in ("final", "truncated"):
         answer = FALLBACK_ANSWERS[stop_reason]
 
+    structured_answer: StructuredAnswer | None = None
+    resolved: ResolvedAnswer | None = None
+    if structured and stop_reason == "final":
+        remaining = config.total_timeout_s - (time.perf_counter() - start)
+        try:
+            async with asyncio.timeout(max(remaining, 0)):
+                structured_answer = await run.structure()
+        except TimeoutError:
+            run.warnings.append("structured_failed")
+        if structured_answer is not None:
+            resolved = resolve_answer(structured_answer, run.records, run.messages)
+
     result = AgentResult(
         answer=answer,
         stop_reason=stop_reason,
@@ -329,6 +428,9 @@ async def run_agent(
         messages=run.messages,
         warnings=run.warnings,
         warnings_detail=run.warnings_detail,
+        structured=structured_answer,
+        resolved=resolved,
+        resolution_errors=list(resolved.errors) if resolved is not None else [],
     )
     logger.info(
         "agent run stop_reason=%s steps=%d tool_calls=%d prompt_tokens=%d "
