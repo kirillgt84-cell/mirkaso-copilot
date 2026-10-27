@@ -1,19 +1,22 @@
 """Structured answer the model writes in the second phase of a structured run.
 
 The model never writes a number itself. Its prose carries placeholders such as ``{v1}``,
-and each placeholder has a ``ValueRef`` that points into one tool result by tool call id
-and JSON Pointer. The server resolves the pointers and substitutes the formatted values
-(see ``resolve.py``), so a number in the rendered answer always comes from a tool result.
+and each placeholder has a ``ValueRef`` that points into one tool result by call
+reference (an alias such as ``t1`` from the list of calls the model is shown) and JSON
+Pointer. The server resolves the pointers and substitutes the formatted values (see
+``resolve.py``), so a number in the rendered answer always comes from a tool result.
 """
 
 import copy
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 VALUE_ID_PATTERN = re.compile(r"v[0-9]{1,3}")  # ^v[0-9]{1,3}$, via fullmatch
 MAX_DECIMALS = 6
+MAX_CLAIMS = 6
+MAX_VALUES = 24
 SCHEMA_NAME = "structured_answer"
 
 ANSWER_RULES = (
@@ -22,8 +25,9 @@ ANSWER_RULES = (
     "time goes, in summary, claims and caveats alike, and add one entry to values for each "
     "placeholder. Digits may appear in the text only as part of timeframes such as 1h, 4h, "
     "24h, 7d and in asset or sector names. Each value points into one tool result above: "
-    "tool_call_id is the id of that tool call and path is a JSON Pointer into its result, "
-    "e.g. /data/sectors/0/sector_score or /as_of."
+    "call_ref is the alias of that call from the list of calls (e.g. t1) and path is a "
+    "JSON Pointer into its result, e.g. /data/sectors/0/sector_score or /as_of. At most "
+    f"{MAX_CLAIMS} claims and {MAX_VALUES} values."
 )
 
 ValueKind = Literal["number", "percent", "usd", "ratio", "count", "timestamp", "text"]
@@ -39,9 +43,11 @@ class ValueRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(description="Placeholder id: v followed by 1 to 3 digits, e.g. v1.")
-    tool_call_id: str = Field(description="The id of the tool call whose result holds the value.")
+    call_ref: str = Field(
+        description="Alias of the tool call whose result holds the value, e.g. t1."
+    )
     path: str = Field(
-        description="JSON Pointer into that tool call's result, e.g. /data/summary/total_usd."
+        description="JSON Pointer into that call's result, e.g. /data/summary/total_usd."
     )
     kind: ValueKind = Field(
         description="usd for US dollar amounts; percent for fields that already are "
@@ -78,6 +84,15 @@ class StructuredAnswer(BaseModel):
     caveats: list[str] = Field(
         description="Limits of the data, e.g. gated fields or stale data; may be empty."
     )
+
+    # Count limits are checked here, not in the schema, like the ValueRef rules above.
+    @model_validator(mode="after")
+    def _limits(self) -> "StructuredAnswer":
+        if len(self.claims) > MAX_CLAIMS:
+            raise ValueError(f"at most {MAX_CLAIMS} claims allowed, got {len(self.claims)}")
+        if len(self.values) > MAX_VALUES:
+            raise ValueError(f"at most {MAX_VALUES} values allowed, got {len(self.values)}")
+        return self
 
 
 def _strip(node: Any) -> Any:

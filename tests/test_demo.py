@@ -264,20 +264,20 @@ def structured_reply(values: list[dict[str, Any]], summary: str) -> dict[str, An
     return reply(json.dumps(body), usage=USAGE)
 
 
-def value(vid: str, call_id: str, path: str, kind: str) -> dict[str, Any]:
-    return {"id": vid, "tool_call_id": call_id, "path": path, "kind": kind, "decimals": None}
+def value(vid: str, call_ref: str, path: str, kind: str) -> dict[str, Any]:
+    return {"id": vid, "call_ref": call_ref, "path": path, "kind": kind, "decimals": None}
 
 
 SECTOR_VALUES = [
-    value("v1", "c1", "/data/sectors/0/slug", "text"),
-    value("v2", "c2", "/data/score", "number"),
-    value("v3", "c2", "/as_of", "timestamp"),
+    value("v1", "t1", "/data/sectors/0/slug", "text"),
+    value("v2", "t2", "/data/score", "number"),
+    value("v3", "t2", "/as_of", "timestamp"),
 ]
 
 
-def scripted_structured(phase_b: dict[str, Any]) -> ScriptedClient:
+def scripted_structured(*phase_b: dict[str, Any]) -> ScriptedClient:
     c = scripted()
-    c.responses.append(phase_b)
+    c.responses.extend(phase_b)
     return c
 
 
@@ -289,33 +289,50 @@ def test_structured_text_output() -> None:
     lines = out.splitlines()
     assert lines[0] == "ai leads as of 2026-10-26 12:00 UTC."
     assert lines[1] == "- Macro score 54.3."
-    assert "AI leads the crypto sectors" not in out  # the plain answer is replaced
+    assert "AI leads the crypto sectors" not in out  # the plain answer is never shown
     assert "values:" in lines
     row = next(ln for ln in lines if ln.lstrip().startswith("v2 "))
-    assert row.split() == ["v2", "54.3", "macro_get_regime", "/data/score", "2026-10-26T12:00:00Z"]
-    assert "resolution errors" not in out
+    assert row.split() == ["v2", "54.3", "t2", "macro_get_regime", "/data/score",
+                           "2026-10-26T12:00:00Z"]  # fmt: skip
+    assert "verified: yes" in lines
+    assert "guard: attempts=1 rejections=0" in lines
     assert "steps: 2  tool calls: 3" in out
-    assert "tokens: prompt=3000 completion=600 reasoning=150 total=3600" in out
+    assert "usage by phase:" in lines
+    assert any(ln.startswith("  tool: prompt=2000 completion=400 reasoning=100 total=2400  ")
+               for ln in lines)  # fmt: skip
+    assert any(ln.startswith("  structured_1: prompt=1000 completion=200 reasoning=50 total=1200")
+               for ln in lines)  # fmt: skip
+    assert any(ln.startswith("  total: prompt=3000 completion=600 reasoning=150 total=3600")
+               for ln in lines)  # fmt: skip
     assert c.requests[2]["response_format"]["json_schema"]["strict"] is True
 
 
-def test_structured_output_lists_resolution_errors() -> None:
-    values = [*SECTOR_VALUES[:2], value("v3", "c3", "/data/price", "usd")]  # c3 is not_found
-    c = scripted_structured(structured_reply(values, "{v1} leads; BTC {v3}; {v4}."))
-    _, out, _ = run_main(["q", "--structured"], c)
+def test_structured_output_after_a_regeneration() -> None:
+    bad = [*SECTOR_VALUES[:2], value("v3", "t3", "/data/price", "usd")]  # t3 is not_found
+    c = scripted_structured(
+        structured_reply(bad, "{v1} leads; BTC {v3}; {v4}."),
+        structured_reply(SECTOR_VALUES, "{v1} leads as of {v3}."),
+    )
+    code, out, _ = run_main(["q", "--structured", "--fixed-time"], c)
 
-    assert "ai leads; BTC {v3}; {v4}." in out
-    assert "  v3: tool_call_failed - " in out
-    assert "  v4: unknown_placeholder - " in out
-
-
-def test_structured_failure_falls_back_to_the_plain_answer() -> None:
-    c = scripted_structured(reply("not json", usage=USAGE))
-    code, out, _ = run_main(["q", "--structured"], c)
     assert code == 0
-    assert "(no structured answer: structured_failed; plain answer below)" in out
-    assert "AI leads the crypto sectors" in out
-    assert "warnings: structured_failed" in out
+    assert out.startswith("ai leads as of 2026-10-26 12:00 UTC.")
+    assert "guard: attempts=2 rejections=1" in out
+    assert "  rejected attempt 1:" in out
+    assert "    - v3: tool_call_failed (Call t3 returned an error, not data.)" in out
+    assert "    - v4: unknown_placeholder (Placeholder {v4} has no entry in values.)" in out
+    assert "  structured_2: prompt=1000" in out
+
+
+def test_structured_refusal_never_shows_the_plain_answer() -> None:
+    c = scripted_structured(reply("not json", usage=USAGE), reply("still not", usage=USAGE))
+    code, out, _ = run_main(["q", "--structured"], c)
+    assert code == 1  # not verified
+    assert out.startswith("I couldn't produce a verified answer for this question.")
+    assert "AI leads the crypto sectors" not in out
+    assert "54.3" not in out
+    assert "verified: no (structured_invalid)" in out
+    assert "guard: attempts=2 rejections=2" in out
 
 
 def test_structured_json_output() -> None:
@@ -323,18 +340,37 @@ def test_structured_json_output() -> None:
     _, out, _ = run_main(["q", "--structured", "--json", "--fixed-time"], c)
 
     payload = json.loads(out)
-    assert payload["structured"]["values"][0]["path"] == "/data/sectors/0/slug"
-    assert payload["resolved"]["summary"] == "ai leads as of 2026-10-26 12:00 UTC."
+    assert payload["answer"] == "ai leads as of 2026-10-26 12:00 UTC.\n- Macro score 54.3."
+    assert (payload["verified"], payload["refusal_reason"]) == (True, None)
+    assert payload["structured"]["values"][0]["call_ref"] == "t1"
     assert payload["resolved"]["values"][1]["formatted"] == "54.3"
+    assert payload["resolved"]["values"][1]["tool_call_id"] == "c2"
+    assert (payload["guard_attempts"], payload["guard_rejections"]) == (1, 0)
+    assert payload["rejected_reasons"] == []
+    assert [p["name"] for p in payload["phases"]] == ["tool", "structured_1"]
+    assert payload["phases"][1]["usage"]["total_tokens"] == 1200
     assert payload["resolution_errors"] == []
-    assert [t["tool_call_id"] for t in payload["tool_calls"]] == ["c1", "c2", "c3"]
+
+
+def test_single_phase_flag() -> None:
+    c = ScriptedClient(
+        reply(tool_calls=[call("macro_get_regime", {}, "c1")], usage=USAGE),
+        reply(json.dumps({"summary": "Score {v1}.", "claims": [], "caveats": [],
+                          "values": [value("v1", "t1", "/data/score", "number")]}),
+              usage=USAGE),
+    )  # fmt: skip
+    code, out, _ = run_main(["q", "--single-phase"], c)
+    assert code == 0
+    assert out.startswith("Score 54.3.")
+    assert all("response_format" in r and r["tools"] for r in c.requests)
+    assert "verified: yes" in out
 
 
 def test_default_run_has_no_structured_phase() -> None:
     c = scripted()
-    _, out, _ = run_main(["q", "--json"], c)
+    code, out, _ = run_main(["q", "--json"], c)
+    assert code == 0
     assert len(c.requests) == 2
     payload = json.loads(out)
-    assert (payload["structured"], payload["resolved"], payload["resolution_errors"]) == (
-        None, None, [],
-    )  # fmt: skip
+    assert (payload["structured"], payload["resolved"], payload["verified"]) == (None, None, None)
+    assert [p["name"] for p in payload["phases"]] == ["tool"]

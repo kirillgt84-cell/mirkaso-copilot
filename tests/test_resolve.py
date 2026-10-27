@@ -69,8 +69,8 @@ MESSAGES = [
 ]
 
 
-def ref(vid: str, call_id: str, path: str, kind: str, decimals: int | None = None) -> dict:
-    return {"id": vid, "tool_call_id": call_id, "path": path, "kind": kind, "decimals": decimals}
+def ref(vid: str, call_ref: str, path: str, kind: str, decimals: int | None = None) -> dict:
+    return {"id": vid, "call_ref": call_ref, "path": path, "kind": kind, "decimals": decimals}
 
 
 def answer(summary: str, values: list[dict], claims=(), caveats=()) -> StructuredAnswer:
@@ -217,7 +217,7 @@ def test_pointer_to_wrong_type(path: str, kind: str) -> None:
 
 def test_unknown_tool_call_id() -> None:
     a = answer("{v1}", [ref("v1", "c9", "/data/summary/total_usd", "usd")])
-    assert errors(a) == [("unknown_tool_call", "v1")]
+    assert errors(a) == [("unknown_call_ref", "v1")]
 
 
 def test_failed_tool_call_is_not_a_source() -> None:
@@ -344,3 +344,132 @@ def test_schema_is_strict() -> None:
         "number", "percent", "usd", "ratio", "count", "timestamp", "text",
     ]  # fmt: skip
     assert "{v1}" in schema["description"]
+
+
+# --- call references -----------------------------------------------------------------
+
+SCANNER = {"as_of": AS_OF, "source_id": "mirkaso.scanner", "gated": False, "gated_fields": [],
+           "data": {"signals": [{"symbol": "BTCUSDT", "score": 11}], "score_max": 13}}  # fmt: skip
+SCANNER_SOL = {
+    **SCANNER,
+    "data": {"signals": [{"symbol": "SOLUSDT", "score": 10}], "score_max": 13},
+}
+TWO_SCANS = [
+    ("call_a", "scanner_get_signals", SCANNER),
+    ("call_b", "scanner_get_signals", SCANNER_SOL),
+    ("call_c", "macro_get_regime", NOT_FOUND),
+]
+
+
+def resolve_with(calls: list[tuple[str, str, dict[str, Any]]], a: StructuredAnswer):
+    records = [record(*c) for c in calls]
+    messages = [
+        {"role": "tool", "tool_call_id": cid, "content": json.dumps(r)} for cid, _, r in calls
+    ]
+    return resolve_answer(a, records, messages)
+
+
+@pytest.mark.parametrize(
+    ("call_ref", "tool_call_id"),
+    [
+        ("t1", "c1"),  # alias: first executed call
+        ("t2", "c2"),
+        ("c2", "c2"),  # the real tool call id still works
+        ("market_get_liquidations", "c1"),  # a tool name used by exactly one successful call
+    ],
+)
+def test_call_ref_forms(call_ref: str, tool_call_id: str) -> None:
+    path = "/as_of" if tool_call_id == "c1" else "/data/sectors/0/slug"
+    kind = "timestamp" if tool_call_id == "c1" else "text"
+    out = resolve(answer("{v1}", [ref("v1", call_ref, path, kind)]))
+    assert out.ok
+    (value,) = out.values
+    assert (value.tool_call_id, value.call_ref) == (
+        tool_call_id,
+        "t1" if tool_call_id == "c1" else "t2",
+    )
+
+
+def test_alias_wins_over_a_real_id_of_the_same_spelling() -> None:
+    calls = [
+        ("t2", "market_get_liquidations", LIQUIDATIONS),
+        ("t1", "sectors_get_indices", SECTORS),
+    ]
+    out = resolve_with(calls, answer("{v1}", [ref("v1", "t1", "/source_id", "text")]))
+    assert out.values[0].formatted == "mirkaso.liquidations"  # t1 = first call, not id "t1"
+
+
+def test_tool_name_used_by_two_successful_calls_is_ambiguous() -> None:
+    a = answer("{v1}", [ref("v1", "scanner_get_signals", "/data/signals/0/score", "number")])
+    out = resolve_with(TWO_SCANS, a)
+    assert [(e.code.value, e.value_id) for e in out.errors] == [("ambiguous_call_ref", "v1")]
+    assert "t1" in out.errors[0].message
+
+
+def test_aliases_disambiguate_calls_of_the_same_tool() -> None:
+    a = answer(
+        "{v1} {v2}",
+        [
+            ref("v1", "t1", "/data/signals/0/symbol", "text"),
+            ref("v2", "t2", "/data/signals/0/symbol", "text"),
+        ],
+    )
+    assert resolve_with(TWO_SCANS, a).summary == "BTCUSDT SOLUSDT"
+
+
+def test_tool_name_of_a_failed_call_only() -> None:
+    a = answer("{v1}", [ref("v1", "macro_get_regime", "/data/score", "number")])
+    out = resolve_with(TWO_SCANS, a)
+    assert [(e.code.value, e.value_id) for e in out.errors] == [("tool_call_failed", "v1")]
+
+
+def test_name_fallback_ignores_failed_calls_of_the_same_tool() -> None:
+    calls = [("x", "coin_get_derivatives", NOT_FOUND), *CALLS[:1]]
+    calls = [
+        *calls,
+        ("y", "coin_get_derivatives", {**LIQUIDATIONS, "source_id": "mirkaso.derivatives"}),
+    ]
+    a = answer("{v1}", [ref("v1", "coin_get_derivatives", "/source_id", "text")])
+    out = resolve_with(calls, a)
+    assert out.ok and out.values[0].call_ref == "t3"
+
+
+@pytest.mark.parametrize("call_ref", ["t9", "t0", "nope", "T1", ""])
+def test_unknown_call_ref(call_ref: str) -> None:
+    out = resolve(answer("{v1}", [ref("v1", call_ref, "/as_of", "timestamp")]))
+    assert [(e.code.value, e.value_id) for e in out.errors] == [("unknown_call_ref", "v1")]
+
+
+# --- no scientific notation ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "kind", "expected"),
+    [
+        (8.5e-05, "number", "0.000085"),
+        (-0.00021, "number", "-0.00021"),
+        (1.23e-08, "number", "0.0000000123"),
+        (1.23e-08, "usd", "$0.0000000123"),
+        (2.5e-07, "percent", "0.00000025%"),
+        (1e-07, "ratio", "0.0000001"),
+        (12100000000.0, "number", "12,100,000,000"),
+        (1.5e20, "number", "150,000,000,000,000,000,000"),
+        (1.5e20, "usd", "$150,000,000T"),
+    ],
+)
+def test_never_scientific_notation(raw: float, kind: str, expected: str) -> None:
+    text = format_value(raw, kind, None, "/x")
+    assert text == expected
+    assert "e" not in text.lower().replace("$", "")
+
+
+# --- limits --------------------------------------------------------------------------
+
+
+def test_claim_and_value_limits_are_enforced_by_pydantic() -> None:
+    values = [ref(f"v{i}", "t1", "/as_of", "timestamp") for i in range(1, 25)]
+    answer("x", values, claims=["c"] * 6)  # at the limits: fine
+    with pytest.raises(ValidationError, match="at most 6 claims allowed, got 7"):
+        answer("x", values, claims=["c"] * 7)
+    with pytest.raises(ValidationError, match="at most 24 values allowed, got 25"):
+        answer("x", [*values, ref("v25", "t1", "/as_of", "timestamp")])

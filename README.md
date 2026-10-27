@@ -41,7 +41,8 @@ mirkaso-copilot-demo "How much was liquidated in the last 24h?" --structured  # 
 | `--show-tools` | off | Print each tool call with its arguments, `ok` or error code, and latency |
 | `--json` | off | Print the full `AgentResult` as JSON: tool call records, usage, warnings and transcript |
 | `--fixed-time` | off | Keep the stored timestamps (base time `2026-10-26T12:00:00Z`) instead of shifting them to now |
-| `--structured` | off | Ask for a [structured answer](#structured-answers) after the tool loop and print its resolved summary and claims, a table of the resolved values (id, value, tool, path, `as_of`) and any resolution errors. One extra model request. With `--json`, `structured`, `resolved` and `resolution_errors` are filled in. |
+| `--structured` | off | Return only a **verified** answer (see [Numeric grounding guard](#numeric-grounding-guard)): print its resolved summary and claims and a table of the resolved values (id, value, call alias, tool, path, `as_of`), or the fixed refusal. Also prints `verified: yes/no`, the guard attempts and rejections with their reasons, and usage and latency per phase (tool, `structured_1`, `structured_2`, total). Exit status 1 if not verified. With `--json`, all of these are in the output. |
+| `--single-phase` | off | Experiment, implies `--structured`: send the answer schema with every tool-loop request instead of a separate structured request. The API may reject this combination; that shows up as `stop_reason: error` with the HTTP details under `--verbose`. |
 | `--verbose` | off | If a model request fails, print the HTTP status and the first 200 characters of the API's error message to stderr (only the error type for connection errors). The key and request headers are never printed. |
 
 What to expect: the model calls one or more tools (several in parallel when the question
@@ -121,6 +122,7 @@ Limits (`AgentConfig`, all overridable):
 | `max_tool_calls_total` | 12 | Tool calls per run |
 | `max_total_tokens` | 40000 | Tokens summed over all requests |
 | `request_max_tokens` | 3000 | `max_tokens` per request (reasoning tokens count toward it) |
+| `structured_max_tokens` | 6000 | `max_tokens` per structured request (and every request in single-phase mode) |
 | `reasoning_effort` | `low` | `low`, `medium` or `high` |
 | `per_tool_timeout_s` | 15 | Time limit for one tool call |
 | `total_timeout_s` | 90 | Time limit for the whole run |
@@ -147,7 +149,8 @@ holds opt-in diagnostics for a failed model request (error type, HTTP status and
 | `truncated` | The model hit `finish_reason: "length"` | `None` |
 | `error` | The model request failed or returned an empty answer | Fixed fallback text |
 
-Fallback texts contain no numbers.
+Fallback texts contain no numbers. Each run also reports usage and latency per phase
+in `phases`.
 
 ## Structured answers
 
@@ -161,9 +164,9 @@ tool result. The server follows the pointer and substitutes the formatted value:
   "summary": "{v1} was liquidated in the last 24h, {v2} of it in longs.",
   "claims": [{"text": "BTC led with {v3}."}],
   "values": [
-    {"id": "v1", "tool_call_id": "call_1", "path": "/data/summary/total_usd", "kind": "usd", "decimals": null},
-    {"id": "v2", "tool_call_id": "call_1", "path": "/data/summary/long_pct", "kind": "percent", "decimals": null},
-    {"id": "v3", "tool_call_id": "call_1", "path": "/data/top_coins/0/total_usd", "kind": "usd", "decimals": null}
+    {"id": "v1", "call_ref": "t1", "path": "/data/summary/total_usd", "kind": "usd", "decimals": null},
+    {"id": "v2", "call_ref": "t1", "path": "/data/summary/long_pct", "kind": "percent", "decimals": null},
+    {"id": "v3", "call_ref": "t1", "path": "/data/top_coins/0/total_usd", "kind": "usd", "decimals": null}
   ],
   "caveats": []
 }
@@ -177,19 +180,35 @@ How it works:
 1. **Phase A** is the normal tool loop, unchanged.
 2. **Phase B**: after the final answer, one more request **without tools** and with
    `response_format` set to the strict JSON schema of `StructuredAnswer`
-   ([`answer.py`](src/mirkaso_copilot/answer.py)). The schema is deliberately limited
-   to a subset that strict modes accept widely. Every object has
-   `additionalProperties: false` and requires all of its properties, `kind` is the only
-   enum, and nullable `decimals` is `"type": ["integer", "null"]`. There is no
-   `pattern`, `minimum`/`maximum` or `anyOf`/`oneOf`. The id format (`^v[0-9]{1,3}$`)
-   and the `decimals` range (0–6) are enforced by pydantic validators when the reply is
-   parsed. The request sends the whole transcript, so
-   the tool call ids and results the pointers refer to are in context, plus an
-   instruction with the placeholder rules. Every number, price, percentage, ratio,
-   count and time must be a placeholder. Digits may appear in the text only in
-   timeframes (`1h`, `24h`, `7d`) and in asset or sector names.
+   ([`answer.py`](src/mirkaso_copilot/answer.py)), with its own token limit
+   (`structured_max_tokens`, 6000). The live model spends about two thirds of its
+   completion tokens on reasoning even at effort `low`. The request sends the whole
+   transcript plus an instruction with the placeholder rules and a **list of every
+   executed call by alias**:
+
+   ```
+   t1 = sectors_get_indices({"asset_class": "crypto"}) ok, source mirkaso.sectors, as_of 2026-10-27T14:13:02Z
+   t2 = macro_get_regime({}) ok, source mirkaso.macro, as_of 2026-10-27T14:13:02Z
+   t3 = coin_get_derivatives({"symbol": "NOPE"}) error not_found
+   ```
+
+   Each value's `call_ref` names a call by its alias. The model cannot see the real
+   tool call ids, and in a live run it filled them with tool names instead. Every
+   number, price, percentage, ratio, count and time must be a placeholder. Digits may
+   appear in the text only in compact timeframes (`15m`, `1h`, `24h`, `7d`) and in
+   asset or sector names. The instruction also limits the answer to 6 claims and 24
+   values.
+
+   The schema is deliberately limited to a subset that strict modes accept widely.
+   Every object has `additionalProperties: false` and requires all of its properties,
+   `kind` is the only enum, and nullable `decimals` is `"type": ["integer", "null"]`.
+   There is no `pattern`, `minimum`/`maximum` or `anyOf`/`oneOf`. The id format
+   (`^v[0-9]{1,3}$`), the `decimals` range (0–6) and the claim and value limits are
+   enforced by pydantic validators when the reply is parsed.
 3. **Resolution** ([`resolve.py`](src/mirkaso_copilot/resolve.py), a pure function).
-   Each `ValueRef` is looked up by `tool_call_id` and its RFC 6901 JSON Pointer is
+   `call_ref` is matched, in this order, as an alias (`t1`), as a real tool call id, or
+   as a tool name that exactly one successful call used. A name used by several
+   successful calls is `ambiguous_call_ref`. The value's RFC 6901 JSON Pointer is then
    followed into that call's result envelope, exactly as the model saw it. The value
    must be a number, or a string for `text` and `timestamp`. It is then formatted for
    its `kind`:
@@ -205,37 +224,116 @@ How it works:
    | `text` | the string as is, e.g. `Neutral` |
 
    `decimals` (0–6) overrides the default precision. For compact USD amounts it applies
-   to the shortened number (`$56.9M` with `decimals: 1`).
+   to the shortened number (`$56.9M` with `decimals: 1`). Formatting **never uses
+   scientific notation**: `0.000085`, not `8.5e-05`. A value too small for the default
+   precision is written out in full (`0.0000000123`).
 
-`AgentResult` then carries `structured` (the parsed answer), `resolved` (rendered
-summary, claims and caveats, the full `text`, and every resolved value with its `value`,
-`formatted` text, `tool`, `source_id`, `as_of` and `path`) and `resolution_errors`.
-Phase B's tokens and time count toward the run's usage and latency. It does not count as
-a step.
+Resolution errors come back as a typed list:
+- `unknown_placeholder`
+- `duplicate_value_id`
+- `unknown_call_ref`
+- `ambiguous_call_ref`
+- `tool_call_failed` (the reference names an error result)
+- `invalid_pointer`
+- `missing_path`
+- `wrong_type`
+
+Values that no placeholder uses are allowed and listed in `unused_values`.
 
 **Why this prevents invented numbers:** every number in the rendered text was read from
-a tool result by the server, and each one can be traced to its tool call, path and
-`as_of`. The model only chooses *which* value to cite. A wrong pointer gives an error,
-never a made-up number. All citable numbers must therefore be in the tool results.
-That is why the macro band ranges are a `bands` list in the result and not text in the
-tool description (see [docs/tools.md](docs/tools.md)).
+a tool result by the server, and each one can be traced to its call, path and `as_of`.
+The model only chooses *which* value to cite. A wrong pointer gives an error, never a
+made-up number. All citable numbers must therefore be in the tool results. That is why
+the macro band ranges are a `bands` list in the result and not text in the tool
+description (see [docs/tools.md](docs/tools.md)). Numbers the model types into the text
+itself are caught by the guard below.
 
-Failures never raise:
+## Numeric grounding guard
 
-- **Resolution errors** are returned as a typed list, so the caller can reject or
-  regenerate the answer: `unknown_placeholder`, `duplicate_value_id`,
-  `unknown_tool_call`, `tool_call_failed` (the pointer targets an error result),
-  `invalid_pointer`, `missing_path`, `wrong_type`. An unresolved placeholder stays
-  visible as `{v1}` in the rendered text. Values that no placeholder uses are allowed
-  and listed in `unused_values`.
-- **Phase B failure**: if the reply is not valid JSON for the schema, is cut off, or
-  the request fails, `stop_reason` stays `final`, `structured` is `None` and the
-  warning `structured_failed` is added. The phase A answer is still in `answer`.
+With `structured=True`, the run returns **only a verified answer or a fixed refusal**:
 
-**Limit:** only placeholders are replaced. If the model ignores the rules and types a
-number into the text (say *"about $57M"*), the resolver leaves it as it is and does not
-flag it. A test pins this behaviour. Rejecting such answers is the job of the answer
-validator, which is the next module.
+```
+tool loop ─► structured answer ─► resolve ─► guard ─┬─► verified answer
+                                                     └─► 1 regeneration ─► resolve ─► guard ─┬─► verified answer
+                                                                                              └─► safe refusal
+```
+
+The guard ([`guard.py`](src/mirkaso_copilot/guard.py), pure functions) rejects an
+answer for any of these:
+
+- **Resolution errors** (see above).
+- **Literal numbers** (`literal_numbers`): digits the model wrote itself, checked on its
+  summary, claims and caveats *before* substitution, so the server's formatted values
+  are never flagged. A digit is allowed only inside a token that fully matches the
+  documented `ALLOWED_TOKEN` regex:
+  - a placeholder `{vN}`;
+  - a compact timeframe (`15m`, `1h`, `24h`, `7d`, `30d`; lower-case unit only, so `15M`
+    is an amount);
+  - a name or ticker (`layer-1`, `layer-2s`, `x402-style`, `web3`, `1INCH`,
+    `1000PEPEUSDT`);
+  - a snake_case field name (`price_change_1h_pct`).
+
+  Everything else is flagged: `$420,000`, `8.5e-05`, `11/13`, `12100000000.0`, `2.5%`,
+  times and dates, ordinals (`1st`) and spelled-out timeframes (`24-hour`). Numbers
+  written as words ("eleven") are not detected.
+- **Advice wording** (`advice_phrases`): a conservative list of English phrases such as
+  "you should buy", "I recommend", "go long", "good time to", "guaranteed", "will go
+  up", "price target" and "financial advice". Disclaimers such as "this is not financial
+  advice" are allowed. Signal labels like "a LONG signal" are not advice. The check is
+  injectable: `run_agent(..., output_guard=fn)` takes any callable from text to a list
+  of offending phrases and replaces the default. The private Mirkaso product plugs its
+  existing output guard in there.
+- **Invalid answers**: a reply that is not valid JSON for the schema, has more than 6
+  claims or 24 values, or was cut off at the token limit.
+
+If the first answer is rejected, **one regeneration** follows. It is a new structured
+request with the rejected reply and a short correction message listing the concrete
+problems, for example:
+
+```
+Your previous answer was rejected for these problems:
+- v4: unknown_call_ref (No call 't9'.)
+- literal number '8.5e-05' in claim 1; use a placeholder
+Fix them and give the complete answer again as JSON that matches the response schema, following the same rules.
+```
+
+Pydantic error messages are passed on without the reply text. If the regeneration is
+rejected too, the run returns a **safe refusal**: *"I couldn't produce a verified answer
+for this question. Please try again or ask more specifically."* That text contains no
+number. `stop_reason` stays `final`, `verified` is `False` and `refusal_reason` is one
+of these:
+- `guard_failed`
+- `structured_invalid`
+- `structured_length`
+- `structured_request_failed` (an HTTP error, which is not retried)
+- `timeout` (the whole structured phase stays within `total_timeout_s`)
+
+A structured run **never falls back to the unverified phase A text**. That text stays in
+the transcript only.
+
+Metrics on `AgentResult`:
+
+| Field | Meaning |
+|---|---|
+| `verified` | `True`, `False`, or `None` for a run without `structured=True` |
+| `refusal_reason` | Why a structured run was refused, else `None` |
+| `answer` | The rendered verified text, or the refusal |
+| `structured`, `resolved` | The verified answer and its resolution; `None` when refused |
+| `resolution_errors` | Resolution errors of the last attempt, for diagnostics |
+| `guard_attempts` | Structured answers checked (1 or 2) |
+| `guard_rejections` | How many of them were rejected |
+| `rejected_reasons` | One list of problem lines per rejected attempt |
+| `phases` | Usage and latency per phase: `tool`, `structured_1`, `structured_2` |
+
+`usage` and `latency_ms` remain the totals over all requests, regenerations included.
+
+**Single-phase experiment** (`structured_mode="single_phase"`, demo `--single-phase`;
+default off): the schema is sent with the tools in every request of the loop, and the
+final message is parsed as the structured answer, which saves one request. The aliases
+`t1`, `t2`, ... are explained in the system prompt, since no call list can be shown in
+advance. A regeneration uses the two-phase request, with the call list. If the API
+rejects tools together with `response_format`, the run ends cleanly with `stop_reason:
+error`, and `--verbose` shows the HTTP details.
 
 ## Tiers
 
