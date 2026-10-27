@@ -20,8 +20,9 @@ NAME = "coin_get_derivatives"
 SOURCE_ID = "mirkaso.derivatives"
 DESCRIPTION = (
     "Get the derivatives snapshot for one coin: price, price changes over 1h/4h/24h, "
-    "open interest and its 1h/24h change, funding rate, trend and market score. "
-    "Set include_history=true for an open-interest and price history of up to "
+    "open interest in USD (open_interest_usd, a US dollar amount, not a number of coins) "
+    "and its 1h/24h change, funding rate, trend and market score. "
+    "Set include_history=true for an open-interest (USD) and price history of up to "
     "history_points points (max 48)."
 )
 
@@ -31,7 +32,7 @@ DERIVATIVES_FIELDS = (
     "price_change_1h_pct",
     "price_change_4h_pct",
     "price_change_24h_pct",
-    "open_interest",
+    "open_interest_usd",
     "oi_change_1h_pct",
     "oi_change_24h_pct",
     "funding_rate",
@@ -46,7 +47,7 @@ class Params(BaseModel):
     symbol: str = Field(
         pattern=r"^[A-Za-z0-9]{1,20}$", description="Coin symbol, e.g. BTC or BTCUSDT."
     )
-    include_history: bool = Field(False, description="Also return open-interest history.")
+    include_history: bool = Field(False, description="Also return open-interest history in USD.")
     history_points: int = Field(
         24, ge=1, le=MAX_HISTORY_POINTS, description="Number of history points (1-48)."
     )
@@ -72,7 +73,7 @@ def rebucket_open_interest(
         out.append(
             {
                 "ts": to_utc_iso(latest["ts"]),
-                "open_interest": latest.get("open_interest"),
+                "open_interest_usd": latest.get("open_interest_usd"),
                 "price": latest.get("price"),
             }
         )

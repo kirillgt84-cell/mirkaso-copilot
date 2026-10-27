@@ -112,10 +112,12 @@ regime) and `panic_override` (true if any row in the bucket had it, which forces
 | `history_points` | integer | 24 | 1–48 |
 
 `data`: `symbol`, `price`, `price_change_1h_pct`, `price_change_4h_pct`,
-`price_change_24h_pct`, `open_interest`, `oi_change_1h_pct`, `oi_change_24h_pct`,
-`funding_rate`, `trend`, `market_score`, and `history[]` (`ts`, `open_interest`,
+`price_change_24h_pct`, `open_interest_usd`, `oi_change_1h_pct`, `oi_change_24h_pct`,
+`funding_rate`, `trend`, `market_score`, and `history[]` (`ts`, `open_interest_usd`,
 `price`) when requested. History is rebucketed to at most `history_points` points,
-keeping the latest open interest and price in each bucket. An unknown symbol returns
+keeping the latest open interest and price in each bucket.
+`open_interest_usd` is open interest in US dollars (base-asset units × price), not
+a number of coins; point a value at it with kind `usd`. An unknown symbol returns
 `not_found`.
 
 ## market_get_liquidations

@@ -105,7 +105,7 @@ for sym, d in DERIVS.items():
         "price_change_1h_pct": d["h1"],
         "price_change_4h_pct": d["h4"],
         "price_change_24h_pct": d["h24"],
-        "open_interest": d["oi"],
+        "open_interest_usd": d["oi"],
         "oi_change_1h_pct": d["oi1"],
         "oi_change_24h_pct": d["oi24"],
         "funding_rate": d["funding"],
@@ -122,11 +122,11 @@ for sym, d in DERIVS.items():
     )
     decimals = 2 if p > 100 else 4
     oi_series[sym] = [
-        {"ts": iso(BASE - timedelta(hours=47 - i)), "open_interest": round(ois[i], -3),
+        {"ts": iso(BASE - timedelta(hours=47 - i)), "open_interest_usd": round(ois[i], -3),
          "price": round(prices[i], decimals)}
         for i in range(48)
     ]  # fmt: skip
-    oi_series[sym][-1]["open_interest"] = o
+    oi_series[sym][-1]["open_interest_usd"] = o
     oi_series[sym][-1]["price"] = p
 
 dump("derivatives.json", {**header(), "coins": derivatives, "open_interest_history": oi_series})

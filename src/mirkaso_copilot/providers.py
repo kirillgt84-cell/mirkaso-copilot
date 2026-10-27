@@ -80,12 +80,12 @@ class DataProvider(Protocol):
 
     async def coin_derivatives(self, *, symbol: str) -> dict[str, Any] | None:
         """``{"as_of", symbol, price, price_change_1h_pct, price_change_4h_pct,
-        price_change_24h_pct, open_interest, oi_change_1h_pct, oi_change_24h_pct,
+        price_change_24h_pct, open_interest_usd, oi_change_1h_pct, oi_change_24h_pct,
         funding_rate, trend, market_score}`` or ``None`` if the symbol is unknown."""
         ...
 
     async def coin_open_interest_history(self, *, symbol: str) -> dict[str, Any]:
-        """``{"points": [{ts, open_interest, price}]}`` at the provider's native resolution."""
+        """``{"points": [{ts, open_interest_usd, price}]}`` at the provider's native resolution."""
         ...
 
     async def liquidations(self, *, period: str, limit: int) -> dict[str, Any]:

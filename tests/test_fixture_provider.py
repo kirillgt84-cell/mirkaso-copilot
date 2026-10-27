@@ -168,7 +168,7 @@ async def test_derivatives_symbols_and_open_interest_history(symbol: str) -> Non
     data = result["data"]
     assert data["symbol"].startswith(symbol.upper().removesuffix("USDT"))
     assert len(data["history"]) == 24
-    assert data["history"][-1]["open_interest"] == data["open_interest"]
+    assert data["history"][-1]["open_interest_usd"] == data["open_interest_usd"]
     assert data["history"][-1]["ts"] == BASE_TIME
 
 

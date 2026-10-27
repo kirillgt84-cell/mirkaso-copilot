@@ -8,7 +8,10 @@ from pydantic import ValidationError
 
 from mirkaso_copilot.agent import ToolCallRecord
 from mirkaso_copilot.answer import StructuredAnswer, answer_json_schema
+from mirkaso_copilot.fixture_provider import FixtureProvider
+from mirkaso_copilot.providers import CallerContext, Tier
 from mirkaso_copilot.resolve import ResolutionErrorCode, format_value, resolve_answer
+from mirkaso_copilot.tools.registry import execute_tool
 
 AS_OF = "2026-10-26T12:00:00Z"
 LIQUIDATIONS = {
@@ -136,7 +139,7 @@ def test_caveats_are_resolved_too() -> None:
     [
         (56867100.0, "usd", None, "/total_usd", "$56.87M"),
         (56867100.0, "usd", 1, "/total_usd", "$56.9M"),
-        (12100000000.0, "usd", None, "/open_interest", "$12.1B"),
+        (12100000000.0, "usd", None, "/open_interest_usd", "$12.1B"),
         (1.5e12, "usd", None, "/x", "$1.5T"),
         (999_999_999.0, "usd", None, "/x", "$1B"),  # 999.999999M rounds up into billions
         (420000.0, "usd", None, "/x", "$420,000"),
@@ -152,7 +155,7 @@ def test_caveats_are_resolved_too() -> None:
         (6.8, "number", None, "/sector_score_delta_24h", "+6.8"),
         (-0.00021, "number", None, "/funding_rate", "-0.00021"),
         (8.5e-05, "number", None, "/funding_rate", "0.000085"),
-        (12100000000.0, "number", None, "/open_interest", "12,100,000,000"),
+        (12100000000.0, "number", None, "/open_interest_usd", "12,100,000,000"),
         (-0.0001, "number", 2, "/x", "0.00"),  # no "-0.00"
         (0.5, "ratio", None, "/breadth_ratio", "0.5"),
         (1.41, "ratio", 1, "/relative_strength_btc", "1.4"),
@@ -188,6 +191,26 @@ def test_pointer_into_missing_path() -> None:
     )
     assert errors(a) == [("missing_path", "v1"), ("missing_path", "v2"), ("missing_path", "v3")]
     assert resolve(a).summary == "{v1} {v2} {v3}"
+
+
+async def test_open_interest_usd_resolves_as_usd_and_old_path_is_gone() -> None:
+    provider, ctx = FixtureProvider(fixed_time=True), CallerContext(tier=Tier.TRADER)
+    args = {"symbol": "BTC", "include_history": True}
+    result = await execute_tool("coin_get_derivatives", args, provider, ctx)
+    calls = [("c1", "coin_get_derivatives", result)]
+    a = answer(
+        "OI {v1}, last point {v2}.",
+        [
+            ref("v1", "t1", "/data/open_interest_usd", "usd"),
+            ref("v2", "t1", "/data/history/23/open_interest_usd", "usd"),
+        ],
+    )
+    out = resolve_with(calls, a)
+    assert out.ok and out.summary == "OI $12.1B, last point $12.1B."
+
+    for path in ("/data/open_interest", "/data/history/23/open_interest"):
+        stale = resolve_with(calls, answer("{v1}", [ref("v1", "t1", path, "usd")]))
+        assert [(e.code.value, e.value_id) for e in stale.errors] == [("missing_path", "v1")]
 
 
 def test_invalid_pointer_syntax() -> None:
