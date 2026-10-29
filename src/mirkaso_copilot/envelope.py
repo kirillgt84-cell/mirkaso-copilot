@@ -46,17 +46,6 @@ class ToolResult(BaseModel):
         return self
 
 
-class LiquidationsResult(ToolResult):
-    newest_event_at: str | None = Field(
-        default=None, description="UTC ISO-8601 time of the newest liquidation in the period."
-    )
-
-    @field_validator("newest_event_at", mode="before")
-    @classmethod
-    def _newest_utc(cls, value: datetime | str | None) -> str | None:
-        return None if value is None else to_utc_iso(value)
-
-
 class ErrorCode(StrEnum):
     UNKNOWN_TOOL = "unknown_tool"
     INVALID_ARGUMENTS = "invalid_arguments"

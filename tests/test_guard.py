@@ -97,7 +97,7 @@ def test_advice_phrases_are_flagged(text: str, hits: list[str]) -> None:
         "Not investment advice.",
         "No financial advice is given here.",
         "SOL has a SHORT signal and BTC a LONG signal.",
-        "Long liquidations were larger than short liquidations.",
+        "Funding turned negative while open interest rose.",
         "Open interest rose while price fell over 1h.",
         "The regime is Neutral.",
     ],

@@ -4,8 +4,8 @@ The private Mirkaso product implements ``DataProvider`` in its own codebase; tes
 use a fake. Every method returns a plain dict. Tools only read the documented keys,
 so extra keys a provider returns never reach the model.
 
-Timestamps (``as_of``, ``ts``, ``bucket``, ``newest_event_at``) are timezone-aware ISO-8601
-strings or datetimes. ``as_of`` is optional; tools fall back to the current time.
+Timestamps (``as_of``, ``ts``, ``detected_at``) are timezone-aware ISO-8601 strings or
+datetimes. ``as_of`` is optional; tools fall back to the current time.
 """
 
 from dataclasses import dataclass
@@ -86,14 +86,4 @@ class DataProvider(Protocol):
 
     async def coin_open_interest_history(self, *, symbol: str) -> dict[str, Any]:
         """``{"points": [{ts, open_interest_usd, price}]}`` at the provider's native resolution."""
-        ...
-
-    async def liquidations(self, *, period: str, limit: int) -> dict[str, Any]:
-        """Aggregates only, no individual events::
-
-        {"as_of", "newest_event_at",
-         "summary": {total_usd, long_usd, short_usd, long_pct, short_pct, count},
-         "top_coins": [{symbol, total_usd, long_usd, short_usd, count}],
-         "time_series": [{bucket, long_usd, short_usd}]}
-        """
         ...

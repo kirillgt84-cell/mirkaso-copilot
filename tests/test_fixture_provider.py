@@ -6,7 +6,7 @@ from importlib import resources
 
 import pytest
 
-from mirkaso_copilot.envelope import ErrorResult, LiquidationsResult, ToolResult, utc_now
+from mirkaso_copilot.envelope import ErrorResult, ToolResult, utc_now
 from mirkaso_copilot.fixture_provider import (
     BASE_TIME,
     FIXTURE_PACKAGE,
@@ -17,13 +17,12 @@ from mirkaso_copilot.fixture_provider import (
 from mirkaso_copilot.providers import CallerContext, Tier
 from mirkaso_copilot.tools import (
     coin_get_derivatives,
-    market_get_liquidations,
     scanner_get_signals,
     sectors_get_indices,
 )
 from mirkaso_copilot.tools.registry import execute_tool, tool_names
 
-FIXTURE_NAMES = ("scanner", "sectors", "macro", "derivatives", "liquidations")
+FIXTURE_NAMES = ("scanner", "sectors", "macro", "derivatives")
 TRADER = CallerContext(tier=Tier.TRADER)
 GUEST = CallerContext(tier=Tier.GUEST)
 
@@ -33,7 +32,6 @@ TOOL_CALLS = {
     "sectors_get_indices": {},
     "macro_get_regime": {"include_history": True, "history_days": 7},
     "coin_get_derivatives": {"symbol": "BTC", "include_history": True, "history_points": 48},
-    "market_get_liquidations": {"period": "24h", "limit": 20},
 }
 
 
@@ -69,8 +67,7 @@ def test_fixture_files_are_marked_synthetic_with_utc_times(name: str) -> None:
 async def test_every_tool_returns_a_valid_result(name: str, tier: Tier) -> None:
     result = await run(name, TOOL_CALLS[name], CallerContext(tier=tier))
     assert "error" not in result, result
-    model = LiquidationsResult if name == "market_get_liquidations" else ToolResult
-    parsed = model.model_validate(result)
+    parsed = ToolResult.model_validate(result)
     assert parsed.as_of == BASE_TIME
 
 
@@ -90,12 +87,6 @@ async def test_full_fidelity_rows_have_every_field() -> None:
 
     coin = (await run("coin_get_derivatives", TOOL_CALLS["coin_get_derivatives"]))["data"]
     assert None not in (coin[f] for f in coin_get_derivatives.DERIVATIVES_FIELDS)
-
-    liq = (await run("market_get_liquidations", TOOL_CALLS["market_get_liquidations"]))["data"]
-    assert set(liq["summary"]) == set(market_get_liquidations.SUMMARY_FIELDS)
-    assert None not in liq["summary"].values()
-    for row in liq["top_coins"]:
-        assert None not in row.values()
 
 
 async def test_scanner_filters_and_limit(fixtures: FixtureProvider) -> None:
@@ -186,21 +177,6 @@ async def test_unknown_symbol_is_not_found(fixtures: FixtureProvider) -> None:
     assert result["error"]["code"] == "not_found"
 
 
-@pytest.mark.parametrize("period", ["1h", "4h", "24h", "7d"])
-async def test_liquidations_periods(period: str, fixtures: FixtureProvider) -> None:
-    payload = await fixtures.liquidations(period=period, limit=5)
-    assert len(payload["top_coins"]) == 5
-    summary = payload["summary"]
-    assert summary["long_usd"] + summary["short_usd"] == summary["total_usd"]
-    assert sum(p["long_usd"] for p in payload["time_series"]) == summary["long_usd"]
-    assert sum(c["total_usd"] for c in payload["top_coins"]) <= summary["total_usd"]
-
-    result = await run("market_get_liquidations", {"period": period, "limit": 20})
-    assert result["data"]["period"] == period
-    assert result["newest_event_at"].endswith("Z")
-    assert len(result["data"]["time_series"]) <= market_get_liquidations.MAX_TIME_SERIES_POINTS
-
-
 async def test_returned_rows_are_copies(fixtures: FixtureProvider) -> None:
     first = await fixtures.sector_indices(asset_class=None)
     first["sectors"][0]["sector_score"] = -1
@@ -217,7 +193,6 @@ SHIFTED_NOW = datetime(2026, 10, 26, 12, tzinfo=UTC) + SHIFT
 async def snapshot(provider: FixtureProvider) -> dict[str, list[str]]:
     """Every timestamp each method returns, keyed by method."""
     macro_history = await provider.macro_regime_history(days=7)
-    liq = await provider.liquidations(period="24h", limit=20)
     oi_points = await provider.coin_open_interest_history(symbol="SOL")
     signals = await provider.scanner_signals(
         min_score=0, direction=None, confidence=None, base_asset=None, limit=20
@@ -228,12 +203,10 @@ async def snapshot(provider: FixtureProvider) -> dict[str, list[str]]:
             (await provider.sector_indices(asset_class=None))["as_of"],
             (await provider.coin_derivatives(symbol="BTC"))["as_of"],
             signals["as_of"],
-            liq["as_of"],
         ],
         "detected_at": [s["detected_at"] for s in signals["signals"]],
         "macro_ts": [p["ts"] for p in macro_history["points"]],
         "oi_ts": [p["ts"] for p in oi_points["points"]],
-        "liq": [liq["newest_event_at"], *(p["bucket"] for p in liq["time_series"])],
     }
 
 
@@ -288,6 +261,6 @@ async def test_default_shifts_to_the_current_time() -> None:
     assert len(history) == 96
     assert datetime.fromisoformat(history[-1]["ts"]) == as_of
 
-    result = await execute_tool("market_get_liquidations", {"period": "1h"}, provider, TRADER)
-    LiquidationsResult.model_validate(result)
-    assert datetime.fromisoformat(result["newest_event_at"]) == as_of - timedelta(seconds=42)
+    result = await execute_tool("coin_get_derivatives", {"symbol": "BTC"}, provider, TRADER)
+    ToolResult.model_validate(result)
+    assert datetime.fromisoformat(result["as_of"]) == as_of

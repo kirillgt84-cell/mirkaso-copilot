@@ -32,7 +32,7 @@ USAGE_B = {"prompt_tokens": 400, "completion_tokens": 90, "total_tokens": 490,
            "completion_tokens_details": {"reasoning_tokens": 30}}  # fmt: skip
 USAGE_C = {"prompt_tokens": 700, "completion_tokens": 60, "total_tokens": 760,
            "completion_tokens_details": {"reasoning_tokens": 10}}  # fmt: skip
-PLAIN_ANSWER = "The regime is Neutral (57) and 3.6M was liquidated."
+PLAIN_ANSWER = "The regime is Neutral (57) and BTC open interest is 12B."
 
 
 def value(vid: str, call_ref: str, path: str, kind: str) -> dict[str, Any]:
@@ -41,25 +41,25 @@ def value(vid: str, call_ref: str, path: str, kind: str) -> dict[str, Any]:
 
 GOOD = {
     "summary": "The regime is {v1} with score {v2} as of {v3}.",
-    "claims": [{"text": "Liquidations totalled {v4} over 24h, {v5} of them longs."}],
+    "claims": [{"text": "BTC open interest is {v4}, {v5} over 24h."}],
     "values": [
         value("v1", "t1", "/data/regime", "text"),
         value("v2", "t1", "/data/score", "number"),
         value("v3", "t1", "/as_of", "timestamp"),
-        value("v4", "t2", "/data/summary/total_usd", "usd"),
-        value("v5", "t2", "/data/summary/long_pct", "percent"),
+        value("v4", "t2", "/data/open_interest_usd", "usd"),
+        value("v5", "t2", "/data/oi_change_24h_pct", "percent"),
     ],
     "caveats": [],
 }
 GOOD_TEXT = (
     "The regime is Neutral with score 57 as of 2026-10-26 12:00 UTC.\n"
-    "- Liquidations totalled $3.6M over 24h, 69.4% of them longs."
+    "- BTC open interest is $12B, +4.2% over 24h."
 )
 # Literal number in a claim and a reference to a call that does not exist.
 BAD = {
     **GOOD,
     "claims": [{"text": "Funding is 8.5e-05 over 24h."}],
-    "values": [*GOOD["values"][:3], value("v4", "t9", "/data/summary/total_usd", "usd")],
+    "values": [*GOOD["values"][:3], value("v4", "t9", "/data/open_interest_usd", "usd")],
 }
 
 
@@ -72,7 +72,7 @@ def client(*structured_replies: dict[str, Any]) -> ScriptedClient:
         reply(
             tool_calls=[
                 call("macro_get_regime", {}, "call_m"),
-                call("market_get_liquidations", {"period": "24h"}, "call_l"),
+                call("coin_get_derivatives", {"symbol": "BTC"}, "call_d"),
             ],
             usage=USAGE_A,
         ),
@@ -111,7 +111,7 @@ async def test_verified_answer(provider: FakeProvider) -> None:
     assert [(v.id, v.call_ref, v.tool_call_id, v.source_id, v.as_of)
             for v in result.resolved.values][::3] == [
         ("v1", "t1", "call_m", "mirkaso.macro", AS_OF),
-        ("v4", "t2", "call_l", "mirkaso.liquidations", AS_OF),
+        ("v4", "t2", "call_d", "mirkaso.derivatives", AS_OF),
     ]  # fmt: skip
 
 
@@ -168,7 +168,7 @@ async def test_tool_name_as_call_ref_still_resolves(provider: FakeProvider) -> N
     by_name = {
         **GOOD,
         "values": [
-            {**v, "call_ref": "macro_get_regime" if v["call_ref"] == "t1" else "call_l"}
+            {**v, "call_ref": "macro_get_regime" if v["call_ref"] == "t1" else "call_d"}
             for v in GOOD["values"]
         ],
     }
@@ -368,7 +368,7 @@ def single_client(*final: dict[str, Any]) -> ScriptedClient:
         reply(
             tool_calls=[
                 call("macro_get_regime", {}, "call_m"),
-                call("market_get_liquidations", {"period": "24h"}, "call_l"),
+                call("coin_get_derivatives", {"symbol": "BTC"}, "call_d"),
             ],
             usage=USAGE_A,
         ),
@@ -402,7 +402,7 @@ async def test_single_phase_regeneration_shows_the_call_list(provider: FakeProvi
     assert "tools" not in regen and regen["response_format"]
     prompt = regen["messages"][-1]["content"]
     assert prompt.startswith(STRUCTURED_INSTRUCTION) and CORRECTION_INTRO in prompt
-    assert "t2 = market_get_liquidations" in prompt
+    assert "t2 = coin_get_derivatives" in prompt
     assert [p.name for p in result.phases] == ["tool", "structured_2"]
 
 

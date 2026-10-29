@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 
+from mirkaso_copilot.envelope import ErrorCode, error_result
 from mirkaso_copilot.providers import CallerContext, ProviderUnavailable, Tier
 from mirkaso_copilot.tools.macro_get_regime import regime_bands
 from mirkaso_copilot.tools.registry import execute_tool, tool_definitions, tool_names
@@ -17,7 +18,6 @@ EXPECTED_TOOLS = {
     "sectors_get_indices",
     "macro_get_regime",
     "coin_get_derivatives",
-    "market_get_liquidations",
 }
 
 
@@ -71,15 +71,21 @@ def test_schema_caps() -> None:
     hp = coin["properties"]["history_points"]
     assert (hp["minimum"], hp["maximum"], hp["default"]) == (1, 48, 24)
 
-    liq = _params("market_get_liquidations")["properties"]
-    assert liq["period"]["enum"] == ["1h", "4h", "24h", "7d"]
-    assert liq["period"]["default"] == "24h"
-    assert (liq["limit"]["minimum"], liq["limit"]["maximum"]) == (1, 20)
+
+def test_registry_has_exactly_four_tools_and_no_liquidations() -> None:
+    names = tool_names()
+    assert len(names) == 4
+    assert len(tool_definitions()) == 4
+    assert not [n for n in names if "liquidat" in n.lower()]
 
 
-async def test_unknown_tool(provider: FakeProvider) -> None:
-    out = await execute_tool("drop_tables", {}, provider, GUEST)
+@pytest.mark.parametrize("name", ["drop_tables", "market_get_liquidations"])
+@pytest.mark.parametrize("args", [{}, None, '{"period": "24h"}', "not json"])
+async def test_unknown_tool(name: str, args: Any, provider: FakeProvider) -> None:
+    out = await execute_tool(name, args, provider, GUEST)
+    assert out == error_result(ErrorCode.UNKNOWN_TOOL).model_dump(mode="json")
     assert out == {"error": {"code": "unknown_tool", "message": "Unknown tool."}}
+    assert provider.calls == []
 
 
 @pytest.mark.parametrize(
@@ -215,47 +221,6 @@ async def test_derivatives_not_found(provider: FakeProvider) -> None:
     provider.derivatives = None
     out = await execute_tool("coin_get_derivatives", {"symbol": "NOPE"}, provider, GUEST)
     assert out["error"]["code"] == "not_found"
-
-
-async def test_liquidations(provider: FakeProvider) -> None:
-    out = await execute_tool("market_get_liquidations", {"period": "4h"}, provider, GUEST)
-    assert out["as_of"] == "2026-10-26T12:00:00Z"
-    assert out["newest_event_at"] == "2026-10-26T11:58:30Z"
-    data = out["data"]
-    assert set(data) == {"period", "summary", "top_coins", "time_series"}
-    assert data["period"] == "4h"
-    assert data["summary"] == {
-        "total_usd": 3.6e6,
-        "long_usd": 2.5e6,
-        "short_usd": 1.1e6,
-        "long_pct": 69.4,
-        "short_pct": 30.6,
-        "count": 42,
-    }
-    assert len(data["top_coins"]) == 10
-    assert set(data["top_coins"][0]) == {"symbol", "total_usd", "long_usd", "short_usd", "count"}
-    assert len(data["time_series"]) == 24
-    assert data["time_series"][0] == {
-        "bucket": "2026-10-20T00:00:00Z",
-        "long_usd": 1000.0,
-        "short_usd": 500.0,
-    }
-    assert "events" not in json.dumps(out)
-    assert provider.calls == [("liquidations", {"period": "4h", "limit": 10})]
-
-
-async def test_liquidations_top_coins_limit(provider: FakeProvider) -> None:
-    out = await execute_tool("market_get_liquidations", {"limit": 20}, provider, GUEST)
-    assert len(out["data"]["top_coins"]) == 20
-
-
-async def test_liquidations_empty_payload(provider: FakeProvider) -> None:
-    provider.liquidations_payload = {"as_of": "2026-10-26T12:00:00Z"}
-    out = await execute_tool("market_get_liquidations", {}, provider, GUEST)
-    assert out["newest_event_at"] is None
-    assert out["data"]["top_coins"] == []
-    assert out["data"]["time_series"] == []
-    assert out["data"]["summary"]["count"] is None
 
 
 @pytest.mark.parametrize(
