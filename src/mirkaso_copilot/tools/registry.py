@@ -12,7 +12,6 @@ from mirkaso_copilot.providers import CallerContext, DataProvider, NotFound, Pro
 from mirkaso_copilot.tools import (
     coin_get_derivatives,
     macro_get_regime,
-    market_get_liquidations,
     scanner_get_signals,
     sectors_get_indices,
 )
@@ -26,7 +25,6 @@ _TOOLS: dict[str, ModuleType] = {
         sectors_get_indices,
         macro_get_regime,
         coin_get_derivatives,
-        market_get_liquidations,
     )
 }
 

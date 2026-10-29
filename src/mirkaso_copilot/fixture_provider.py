@@ -27,7 +27,7 @@ FIXTURE_PACKAGE = "mirkaso_copilot.fixtures"
 SYNTHETIC_NOTICE = "synthetic demo data - not real market data"
 QUOTE_SUFFIX = "USDT"
 # Keys whose values are timestamps. ``base_time`` is metadata and is never shifted.
-TIMESTAMP_KEYS = frozenset({"as_of", "ts", "bucket", "newest_event_at", "detected_at"})
+TIMESTAMP_KEYS = frozenset({"as_of", "ts", "detected_at"})
 
 
 @cache
@@ -134,14 +134,3 @@ class FixtureProvider:
     async def coin_open_interest_history(self, *, symbol: str) -> dict[str, Any]:
         points = self._fixture("derivatives")["open_interest_history"].get(_pair(symbol), [])
         return {"points": _copy(points)}
-
-    async def liquidations(self, *, period: str, limit: int) -> dict[str, Any]:
-        fixture = self._fixture("liquidations")
-        data = fixture["periods"][period]
-        return {
-            "as_of": fixture["as_of"],
-            "newest_event_at": data["newest_event_at"],
-            "summary": dict(data["summary"]),
-            "top_coins": _copy(data["top_coins"][:limit]),
-            "time_series": _copy(data["time_series"]),
-        }

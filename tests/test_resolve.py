@@ -14,12 +14,14 @@ from mirkaso_copilot.resolve import ResolutionErrorCode, format_value, resolve_a
 from mirkaso_copilot.tools.registry import execute_tool
 
 AS_OF = "2026-10-26T12:00:00Z"
-LIQUIDATIONS = {
+# The resolver does not depend on any particular tool: this envelope belongs to a
+# fictional tool so the tests can cover every kind (usd, count, a top-level timestamp).
+TOTALS = {
     "as_of": AS_OF,
-    "source_id": "mirkaso.liquidations",
+    "source_id": "example.totals",
     "gated": False,
     "gated_fields": [],
-    "newest_event_at": "2026-10-26T11:59:18Z",
+    "updated_at": "2026-10-26T11:59:18Z",
     "data": {
         "period": "24h",
         "summary": {"total_usd": 56867100.0, "long_usd": 37085600.0, "short_usd": 19781500.0,
@@ -59,7 +61,7 @@ def record(call_id: str, name: str, result: dict[str, Any]) -> ToolCallRecord:
 
 
 CALLS = [
-    ("c1", "market_get_liquidations", LIQUIDATIONS),
+    ("c1", "example_get_totals", TOTALS),
     ("c2", "sectors_get_indices", SECTORS),
     ("c3", "coin_get_derivatives", NOT_FOUND),
 ]
@@ -93,7 +95,7 @@ def resolve(a: StructuredAnswer):
 
 def test_valid_answer_resolves_every_kind() -> None:
     a = answer(
-        "{v1} was liquidated in the last 24h as of {v2}.",
+        "{v1} was traded in the last 24h as of {v2}.",
         [
             ref("v1", "c1", "/data/summary/total_usd", "usd"),
             ref("v2", "c1", "/as_of", "timestamp"),
@@ -105,7 +107,7 @@ def test_valid_answer_resolves_every_kind() -> None:
             ref("v8", "c2", "/data/sectors/0/sector_score", "number"),
         ],
         claims=[
-            "Longs were {v3} of {v4} liquidations.",
+            "Longs were {v3} of {v4} trades.",
             "{v6} leads with score {v8}, {v7} over 24h and {v5} strength vs BTC.",
         ],
     )
@@ -113,15 +115,15 @@ def test_valid_answer_resolves_every_kind() -> None:
     out = resolve(a)
 
     assert out.ok and out.errors == [] and out.unused_values == []
-    assert out.summary == "$56.87M was liquidated in the last 24h as of 2026-10-26 12:00 UTC."
+    assert out.summary == "$56.87M was traded in the last 24h as of 2026-10-26 12:00 UTC."
     assert out.claims == [
-        "Longs were 65.2% of 6,114 liquidations.",
+        "Longs were 65.2% of 6,114 trades.",
         "ai leads with score 74.2, +4.9% over 24h and 1.41 strength vs BTC.",
     ]
     assert out.text == "\n".join([out.summary, *(f"- {c}" for c in out.claims)])
     v1 = out.values[0]
     assert (v1.id, v1.value, v1.formatted, v1.tool, v1.source_id, v1.as_of, v1.path) == (
-        "v1", 56867100.0, "$56.87M", "market_get_liquidations", "mirkaso.liquidations",
+        "v1", 56867100.0, "$56.87M", "example_get_totals", "example.totals",
         AS_OF, "/data/summary/total_usd",
     )  # fmt: skip
     assert [v.formatted for v in out.values] == [
@@ -130,7 +132,7 @@ def test_valid_answer_resolves_every_kind() -> None:
 
 
 def test_caveats_are_resolved_too() -> None:
-    a = answer("x", [ref("v1", "c1", "/newest_event_at", "timestamp")], caveats=["Newest {v1}."])
+    a = answer("x", [ref("v1", "c1", "/updated_at", "timestamp")], caveats=["Newest {v1}."])
     assert resolve(a).caveats == ["Newest 2026-10-26 11:59 UTC."]
 
 
@@ -279,12 +281,12 @@ def test_literal_numbers_in_text_are_left_as_is() -> None:
     """Golden: only placeholders are replaced. A number the model typed itself is kept
     verbatim (and not flagged here); the answer validator (card 10) rejects it."""
     a = answer(
-        "Liquidations hit $57M ({v1}) with 6114 events in the last 24h.",
+        "Volume hit $57M ({v1}) with 6114 trades in the last 24h.",
         [ref("v1", "c1", "/data/summary/total_usd", "usd")],
     )
     out = resolve(a)
     assert out.ok
-    assert out.summary == "Liquidations hit $57M ($56.87M) with 6114 events in the last 24h."
+    assert out.summary == "Volume hit $57M ($56.87M) with 6114 trades in the last 24h."
 
 
 @pytest.mark.parametrize("vid", ["v1", "v0", "v42", "v999"])
@@ -398,7 +400,7 @@ def resolve_with(calls: list[tuple[str, str, dict[str, Any]]], a: StructuredAnsw
         ("t1", "c1"),  # alias: first executed call
         ("t2", "c2"),
         ("c2", "c2"),  # the real tool call id still works
-        ("market_get_liquidations", "c1"),  # a tool name used by exactly one successful call
+        ("example_get_totals", "c1"),  # a tool name used by exactly one successful call
     ],
 )
 def test_call_ref_forms(call_ref: str, tool_call_id: str) -> None:
@@ -415,11 +417,11 @@ def test_call_ref_forms(call_ref: str, tool_call_id: str) -> None:
 
 def test_alias_wins_over_a_real_id_of_the_same_spelling() -> None:
     calls = [
-        ("t2", "market_get_liquidations", LIQUIDATIONS),
+        ("t2", "example_get_totals", TOTALS),
         ("t1", "sectors_get_indices", SECTORS),
     ]
     out = resolve_with(calls, answer("{v1}", [ref("v1", "t1", "/source_id", "text")]))
-    assert out.values[0].formatted == "mirkaso.liquidations"  # t1 = first call, not id "t1"
+    assert out.values[0].formatted == "example.totals"  # t1 = first call, not id "t1"
 
 
 def test_tool_name_used_by_two_successful_calls_is_ambiguous() -> None:
@@ -450,7 +452,7 @@ def test_name_fallback_ignores_failed_calls_of_the_same_tool() -> None:
     calls = [("x", "coin_get_derivatives", NOT_FOUND), *CALLS[:1]]
     calls = [
         *calls,
-        ("y", "coin_get_derivatives", {**LIQUIDATIONS, "source_id": "mirkaso.derivatives"}),
+        ("y", "coin_get_derivatives", {**TOTALS, "source_id": "mirkaso.derivatives"}),
     ]
     a = answer("{v1}", [ref("v1", "coin_get_derivatives", "/source_id", "text")])
     out = resolve_with(calls, a)

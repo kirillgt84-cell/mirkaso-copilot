@@ -1,7 +1,8 @@
 # Tool specification
 
-Five tools are exposed to the model. Parameter caps are enforced by the JSON schema
-(`additionalProperties: false`) and again by server-side validation.
+Four tools are exposed to the model: `scanner_get_signals`, `sectors_get_indices`,
+`macro_get_regime` and `coin_get_derivatives`. Parameter caps are enforced by the JSON
+schema (`additionalProperties: false`) and again by server-side validation.
 
 Tool descriptions state no data numbers (thresholds, scales, band ranges): only
 timeframes such as `1h` or `24h` and caps on what a call may return. Every number an
@@ -120,27 +121,9 @@ keeping the latest open interest and price in each bucket.
 a number of coins; point a value at it with kind `usd`. An unknown symbol returns
 `not_found`.
 
-## market_get_liquidations
+## Not exposed: liquidations
 
-| Parameter | Type | Default | Constraint |
-|---|---|---|---|
-| `period` | string | `24h` | `1h` \| `4h` \| `24h` \| `7d` |
-| `limit` | integer | 10 | 1–20 (number of `top_coins`) |
-
-Aggregates only. Individual liquidation events are never returned.
-
-The envelope has a top-level `newest_event_at` next to `as_of`: the UTC time of the
-newest liquidation seen, or `null` if there is none.
-
-`data`:
-
-| Field | Shape |
-|---|---|
-| `period` | the requested period |
-| `summary` | `{total_usd, long_usd, short_usd, long_pct, short_pct, count}` |
-| `top_coins[]` | `{symbol, total_usd, long_usd, short_usd, count}`, at most `limit` entries |
-| `time_series[]` | `{bucket, long_usd, short_usd}`, `bucket` is UTC ISO-8601, at most 168 points |
-
-If the source has more than 168 time-series points, they are rebucketed evenly into
-168 time-ordered buckets. Each bucket sums `long_usd` and `short_usd` and is labelled
-with the start of its first source bucket. Only the fields listed above are returned.
+Liquidations are intentionally excluded until a reliable data source exists. The data
+source behind them is currently unavailable, and a tool over it would report empty totals
+as if nothing had been liquidated. A call to the former `market_get_liquidations` name
+returns `unknown_tool`.

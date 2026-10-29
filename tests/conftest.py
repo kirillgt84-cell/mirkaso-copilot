@@ -92,21 +92,6 @@ class FakeProvider:
             96, open_interest_usd=lambda i: 1e10 + i, price=lambda i: 67000.0 + i
         )
         self.derivatives: dict[str, Any] | None = DERIVATIVES
-        self.liquidations_payload: dict[str, Any] = {
-            "as_of": AS_OF,
-            "newest_event_at": "2026-10-26T11:58:30+00:00",
-            "summary": {"total_usd": 3.6e6, "long_usd": 2.5e6, "short_usd": 1.1e6,
-                        "long_pct": 69.4, "short_pct": 30.6, "count": 42,
-                        "internal_note": "must never reach the model"},
-            "top_coins": [
-                {"symbol": f"COIN{i}USDT", "total_usd": 1e6 - i, "long_usd": 6e5,
-                 "short_usd": 4e5 - i, "count": 10, "venue_id": "x"}
-                for i in range(25)
-            ],
-            "time_series": hourly_points(24, long_usd=lambda i: 1000.0, short_usd=lambda i: 500.0),
-        }  # fmt: skip
-        for row in self.liquidations_payload["time_series"]:
-            row["bucket"] = row.pop("ts")
 
     def _record(self, name: str, **kwargs: Any) -> None:
         self.calls.append((name, kwargs))
@@ -136,10 +121,6 @@ class FakeProvider:
     async def coin_open_interest_history(self, **kwargs: Any) -> dict[str, Any]:
         self._record("coin_open_interest_history", **kwargs)
         return {"points": self.oi_points}
-
-    async def liquidations(self, **kwargs: Any) -> dict[str, Any]:
-        self._record("liquidations", **kwargs)
-        return self.liquidations_payload
 
 
 def call(name: str, args: Any = None, call_id: str = "c1") -> dict[str, Any]:

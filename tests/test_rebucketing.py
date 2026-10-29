@@ -6,34 +6,7 @@ from mirkaso_copilot.tools.macro_get_regime import (
     rebucket_macro_history,
     regime_for_score,
 )
-from mirkaso_copilot.tools.market_get_liquidations import rebucket_time_series
 from tests.conftest import hourly_points
-
-
-def _liq_series(n: int) -> list[dict[str, object]]:
-    rows = hourly_points(n, long_usd=lambda i: 10.0 * i, short_usd=lambda i: 1.0)
-    for row in rows:
-        row["bucket"] = row.pop("ts")
-    return rows
-
-
-def test_liq_time_series_short_passes_through() -> None:
-    out = rebucket_time_series(_liq_series(168))
-    assert len(out) == 168
-    assert out[5] == {"bucket": "2026-10-20T05:00:00Z", "long_usd": 50.0, "short_usd": 1.0}
-
-
-def test_liq_time_series_rebuckets_to_168_and_sums() -> None:
-    rows = _liq_series(336)  # two rows per bucket
-    out = rebucket_time_series(list(reversed(rows)))
-    assert len(out) == 168
-    assert out[0] == {"bucket": "2026-10-20T00:00:00Z", "long_usd": 10.0, "short_usd": 2.0}
-    assert out[1]["bucket"] == "2026-10-20T02:00:00Z"
-    assert sum(p["long_usd"] for p in out) == sum(r["long_usd"] for r in rows)
-
-
-def test_liq_time_series_uneven_never_exceeds_168() -> None:
-    assert len(rebucket_time_series(_liq_series(1000))) == 168
 
 
 @pytest.mark.parametrize(
