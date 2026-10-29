@@ -4,8 +4,24 @@ An agentic market assistant built on **Meta Muse Spark** with function calling o
 Mirkaso's public market data: scanner signals, sector indices, the macro risk regime
 and per-coin derivatives.
 
+## Timeline
+
 Built during the **Meta Global AI Developer Hackathon, Oct 26 – Nov 4, 2026**. Everything
-in this repository was written during the hackathon.
+in this repository was written during the hackathon. The work spans this repository and
+the private Mirkaso product repository; dates are in Europe/Madrid time.
+
+- **Before the hackathon:** the Mirkaso platform ([mirkaso.com](https://mirkaso.com)) with
+  its scanner, sector indices, macro regime and derivatives data. It is closed source and
+  not part of this repository.
+- **Oct 26 (kickoff day), groundwork:** in this repository, the tool layer, the Meta Model
+  API client, the agent loop and the demo CLI. In the private product repository, an opt-in
+  Meta Model API provider.
+- **Oct 27 – Oct 29, this repository:** structured answers with server-resolved numbers,
+  the numeric grounding guard, tool fixes, and the removal of the liquidations tool, which
+  leaves four tools.
+- **Oct 27 – Oct 29, private product repository:** a data adapter for this package, the
+  Copilot API behind a feature flag, a chat panel, an EU forwarding proxy for the Meta
+  Model API, and the production release.
 
 ## Try it
 
