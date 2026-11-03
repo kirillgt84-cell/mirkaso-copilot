@@ -8,7 +8,7 @@ from mirkaso_copilot.envelope import ErrorCode, error_result
 from mirkaso_copilot.providers import CallerContext, ProviderUnavailable, Tier
 from mirkaso_copilot.tools.macro_get_regime import regime_bands
 from mirkaso_copilot.tools.registry import execute_tool, tool_definitions, tool_names
-from tests.conftest import FakeProvider
+from tests.conftest import DERIVATIVES, FakeProvider
 
 GUEST = CallerContext(tier=Tier.GUEST)
 TRADER = CallerContext(tier=Tier.TRADER)
@@ -204,6 +204,26 @@ async def test_derivatives(provider: FakeProvider) -> None:
     assert len(out["data"]["history"]) == 12
     assert set(out["data"]["history"][0]) == {"ts", "open_interest_usd", "price"}
     assert provider.calls[0] == ("coin_derivatives", {"symbol": "BTCUSDT"})
+
+
+async def test_derivatives_volume_passes_through(provider: FakeProvider) -> None:
+    provider.derivatives = {
+        **DERIVATIVES,
+        "volume_24h_usd": 3.4e10,
+        "volume_change_24h_pct": -12.5,
+        "volume_4h_usd": 1.0,
+    }
+    out = await execute_tool("coin_get_derivatives", {"symbol": "BTC"}, provider, GUEST)
+    assert out["data"]["volume_24h_usd"] == 3.4e10
+    assert out["data"]["volume_change_24h_pct"] == -12.5
+    assert "volume_4h_usd" not in out["data"]
+
+
+async def test_derivatives_volume_optional(provider: FakeProvider) -> None:
+    out = await execute_tool("coin_get_derivatives", {"symbol": "BTC"}, provider, GUEST)
+    assert out["data"]["volume_24h_usd"] is None
+    assert out["data"]["volume_change_24h_pct"] is None
+    assert out["data"]["funding_rate"] == 0.0001
 
 
 async def test_derivatives_without_history(provider: FakeProvider) -> None:
