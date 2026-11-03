@@ -81,7 +81,11 @@ class DataProvider(Protocol):
     async def coin_derivatives(self, *, symbol: str) -> dict[str, Any] | None:
         """``{"as_of", symbol, price, price_change_1h_pct, price_change_4h_pct,
         price_change_24h_pct, open_interest_usd, oi_change_1h_pct, oi_change_24h_pct,
-        funding_rate, trend, market_score}`` or ``None`` if the symbol is unknown."""
+        funding_rate, trend, market_score}`` or ``None`` if the symbol is unknown.
+
+        Optional keys: ``volume_24h_usd`` (rolling 24h quote volume in USD) and
+        ``volume_change_24h_pct`` (deviation of that volume from its 24h average, not
+        growth); either may be absent."""
         ...
 
     async def coin_open_interest_history(self, *, symbol: str) -> dict[str, Any]:

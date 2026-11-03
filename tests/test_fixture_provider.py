@@ -86,7 +86,9 @@ async def test_full_fidelity_rows_have_every_field() -> None:
         assert None not in row.values()
 
     coin = (await run("coin_get_derivatives", TOOL_CALLS["coin_get_derivatives"]))["data"]
-    assert None not in (coin[f] for f in coin_get_derivatives.DERIVATIVES_FIELDS)
+    optional = {"volume_24h_usd", "volume_change_24h_pct"}
+    required = (f for f in coin_get_derivatives.DERIVATIVES_FIELDS if f not in optional)
+    assert None not in (coin[f] for f in required)
 
 
 async def test_scanner_filters_and_limit(fixtures: FixtureProvider) -> None:

@@ -22,6 +22,10 @@ DESCRIPTION = (
     "Get the derivatives snapshot for one coin: price, price changes over 1h/4h/24h, "
     "open interest in USD (open_interest_usd, a US dollar amount, not a number of coins) "
     "and its 1h/24h change, funding rate, trend and market score. "
+    "volume_24h_usd is the rolling 24h quote volume in USD. volume_change_24h_pct is the "
+    "deviation of that rolling 24h volume from its average over the last 24h, not volume "
+    "growth over 24h. Both may be null. Volume for 4h or any other interval shorter than "
+    "24h is not available: say so instead of estimating it. "
     "Set include_history=true for an open-interest (USD) and price history of up to "
     "history_points points (max 48)."
 )
@@ -38,6 +42,8 @@ DERIVATIVES_FIELDS = (
     "funding_rate",
     "trend",
     "market_score",
+    "volume_24h_usd",
+    "volume_change_24h_pct",
 )
 
 
