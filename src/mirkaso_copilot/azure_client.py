@@ -1,12 +1,15 @@
-"""Minimal async client for the Meta Model API (OpenAI-compatible chat completions).
+"""Minimal async client for Azure OpenAI chat completions (the v1 API).
 
 Configuration comes only from the environment:
 
-- ``META_API_KEY``  (required) bearer token
-- ``META_MODEL``    (required) model id, e.g. the Muse Spark model
-- ``META_API_BASE`` (optional) defaults to https://api.meta.ai/v1
+- ``AZURE_OPENAI_API_KEY``    (required) sent in the ``api-key`` header
+- ``AZURE_OPENAI_ENDPOINT``   (required) e.g. https://<resource>.openai.azure.com
+- ``AZURE_OPENAI_DEPLOYMENT`` (required) the deployment name, not the model name
 
-No retries yet: any failure surfaces to the caller as ``MetaAPIError``.
+Requests go to ``<endpoint>/openai/v1/chat/completions`` with the deployment name in the
+``model`` field. The v1 API needs no ``api-version`` parameter.
+
+No retries yet: any failure surfaces to the caller as ``AzureAPIError``.
 """
 
 import json
@@ -17,7 +20,7 @@ from typing import Any
 
 import httpx
 
-DEFAULT_API_BASE = "https://api.meta.ai/v1"
+V1_PATH = "/openai/v1"
 REASONING_EFFORTS = frozenset({"low", "medium", "high"})
 _MAX_ERROR_BODY = 500
 _MAX_DETAIL_MESSAGE = 200
@@ -25,11 +28,11 @@ _MAX_DETAIL_MESSAGE = 200
 logger = logging.getLogger(__name__)
 
 
-class MetaConfigError(RuntimeError):
+class AzureConfigError(RuntimeError):
     """Required configuration is missing from the environment."""
 
 
-class MetaAPIError(RuntimeError):
+class AzureAPIError(RuntimeError):
     def __init__(self, message: str, status_code: int | None = None, body: str | None = None):
         super().__init__(message)
         self.status_code = status_code
@@ -90,38 +93,47 @@ def describe_error(exc: BaseException) -> dict[str, Any]:
     exception text are never included. Without an HTTP response (e.g. a connection error)
     only the type of the underlying exception is given.
     """
-    if isinstance(exc, MetaAPIError) and exc.status_code is not None:
+    if isinstance(exc, AzureAPIError) and exc.status_code is not None:
         return {
             "error_type": type(exc).__name__,
             "status_code": exc.status_code,
             "message": _body_error_message(exc.body),
         }
-    cause = exc.__cause__ if isinstance(exc, MetaAPIError) and exc.__cause__ else exc
+    cause = exc.__cause__ if isinstance(exc, AzureAPIError) and exc.__cause__ else exc
     return {"error_type": type(cause).__name__, "status_code": None, "message": None}
 
 
 def _require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
-        raise MetaConfigError(f"{name} is not set")
+        raise AzureConfigError(f"{name} is not set")
     return value
 
 
-class MetaClient:
+def v1_base_url(endpoint: str) -> str:
+    """``<endpoint>/openai/v1/``; an endpoint that already ends in ``/openai/v1`` is kept."""
+    base = endpoint.strip().rstrip("/")
+    if not base.endswith(V1_PATH):
+        base += V1_PATH
+    return base + "/"
+
+
+class AzureClient:
     def __init__(
         self, *, timeout: float = 60.0, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
-        api_key = _require_env("META_API_KEY")
-        self.model = _require_env("META_MODEL")
-        base_url = os.environ.get("META_API_BASE") or DEFAULT_API_BASE
+        api_key = _require_env("AZURE_OPENAI_API_KEY")
+        base_url = v1_base_url(_require_env("AZURE_OPENAI_ENDPOINT"))
+        # The v1 API takes the deployment name where OpenAI takes a model id.
+        self.model = _require_env("AZURE_OPENAI_DEPLOYMENT")
         self._http = httpx.AsyncClient(
             base_url=base_url,
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"api-key": api_key},
             timeout=timeout,
             transport=transport,
         )
 
-    async def __aenter__(self) -> "MetaClient":
+    async def __aenter__(self) -> "AzureClient":
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
@@ -140,7 +152,12 @@ class MetaClient:
         reasoning_effort: str | None = None,
         max_tokens: int | None = None,
     ) -> dict[str, Any]:
-        """POST /chat/completions and return the decoded response body."""
+        """POST /chat/completions and return the decoded response body.
+
+        ``max_tokens`` is sent as ``max_completion_tokens``: reasoning models accept only
+        that, and the API marks ``max_tokens`` as deprecated. ``reasoning_effort`` is sent
+        only when given, since models without reasoning reject it.
+        """
         if reasoning_effort is not None and reasoning_effort not in REASONING_EFFORTS:
             raise ValueError(f"reasoning_effort must be one of {sorted(REASONING_EFFORTS)}")
 
@@ -154,15 +171,15 @@ class MetaClient:
         if reasoning_effort is not None:
             payload["reasoning_effort"] = reasoning_effort
         if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
+            payload["max_completion_tokens"] = max_tokens
 
         try:
             response = await self._http.post("chat/completions", json=payload)
         except httpx.HTTPError as exc:
-            raise MetaAPIError(f"request failed: {type(exc).__name__}") from exc
+            raise AzureAPIError(f"request failed: {type(exc).__name__}") from exc
         if response.status_code >= 400:
-            raise MetaAPIError(
-                f"Meta API returned HTTP {response.status_code}",
+            raise AzureAPIError(
+                f"Azure OpenAI returned HTTP {response.status_code}",
                 status_code=response.status_code,
                 body=response.text[:_MAX_ERROR_BODY],
             )
@@ -170,7 +187,7 @@ class MetaClient:
         body = response.json()
         usage = parse_usage(body)
         logger.info(
-            "meta chat completion model=%s prompt_tokens=%s completion_tokens=%s "
+            "azure chat completion deployment=%s prompt_tokens=%s completion_tokens=%s "
             "reasoning_tokens=%s total_tokens=%s",
             self.model,
             usage.prompt_tokens,

@@ -21,7 +21,7 @@ from mirkaso_copilot.agent import (
     run_agent,
 )
 from mirkaso_copilot.answer import answer_json_schema
-from mirkaso_copilot.meta_client import MetaAPIError
+from mirkaso_copilot.azure_client import AzureAPIError
 from mirkaso_copilot.providers import CallerContext, Tier
 from tests.conftest import AS_OF, FakeProvider, ScriptedClient, call, reply
 
@@ -284,7 +284,7 @@ async def test_failed_request_is_a_refusal_without_retry(provider: FakeProvider)
         async def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
             if "response_format" in kwargs:
                 self.requests.append(kwargs)
-                raise MetaAPIError("Meta API returned HTTP 400", status_code=400, body="{}")
+                raise AzureAPIError("Azure OpenAI returned HTTP 400", status_code=400, body="{}")
             return await super().chat(messages, **kwargs)
 
     c = Client(reply(tool_calls=[call("macro_get_regime", {}, "m")]), reply(PLAIN_ANSWER))
@@ -296,7 +296,7 @@ async def test_failed_request_is_a_refusal_without_retry(provider: FakeProvider)
     assert result.guard_attempts == 0
     assert result.warnings == ["structured_failed"]
     assert result.warnings_detail == [
-        {"warning": "structured_failed", "error_type": "MetaAPIError", "status_code": 400,
+        {"warning": "structured_failed", "error_type": "AzureAPIError", "status_code": 400,
          "message": None}
     ]  # fmt: skip
 
@@ -412,8 +412,8 @@ async def test_single_phase_rejected_by_the_api_is_reported_cleanly(
     class Rejecting(ScriptedClient):
         async def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
             if kwargs.get("tools") and "response_format" in kwargs:
-                raise MetaAPIError(
-                    "Meta API returned HTTP 400",
+                raise AzureAPIError(
+                    "Azure OpenAI returned HTTP 400",
                     status_code=400,
                     body='{"error": {"message": "tools with response_format"}}',
                 )

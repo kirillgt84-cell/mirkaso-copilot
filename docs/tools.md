@@ -1,7 +1,8 @@
 # Tool specification
 
-Four tools are exposed to the model: `scanner_get_signals`, `sectors_get_indices`,
-`macro_get_regime` and `coin_get_derivatives`. Parameter caps are enforced by the JSON
+Four tools are exposed to the model through Azure OpenAI function calling:
+`scanner_get_signals`, `sectors_get_indices`, `macro_get_regime` and
+`coin_get_derivatives`. Parameter caps are enforced by the JSON
 schema (`additionalProperties: false`) and again by server-side validation.
 
 Tool descriptions state no data numbers (thresholds, scales, band ranges): only

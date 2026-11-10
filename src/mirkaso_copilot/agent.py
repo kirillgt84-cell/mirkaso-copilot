@@ -1,4 +1,4 @@
-"""Tool-calling agent loop over the Meta Model API.
+"""Tool-calling agent loop over Azure OpenAI chat completions.
 
 ``run_agent`` sends the question with every tool definition, executes the tool calls the
 model asks for (concurrently, each under its own timeout), feeds the results back and
@@ -24,9 +24,9 @@ from typing import Any, Protocol
 from pydantic import ValidationError
 
 from mirkaso_copilot.answer import MAX_CLAIMS, MAX_VALUES, StructuredAnswer, response_format
+from mirkaso_copilot.azure_client import REASONING_EFFORTS, describe_error, parse_usage
 from mirkaso_copilot.envelope import ErrorCode, error_result
 from mirkaso_copilot.guard import OutputGuard, check_answer
-from mirkaso_copilot.meta_client import REASONING_EFFORTS, describe_error, parse_usage
 from mirkaso_copilot.providers import CallerContext, DataProvider
 from mirkaso_copilot.resolve import ResolutionError, ResolvedAnswer, call_alias, resolve_answer
 from mirkaso_copilot.tools.registry import canonical_call, execute_tool, tool_definitions
@@ -122,14 +122,15 @@ class AgentConfig:
     request_max_tokens: int = 3000
     # The structured reply is long JSON and reasoning counts toward it.
     structured_max_tokens: int = 6000
-    reasoning_effort: str = "low"
+    # None sends no reasoning_effort: models without reasoning reject the parameter.
+    reasoning_effort: str | None = None
     total_timeout_s: float = 90.0
     per_tool_timeout_s: float = 15.0
     max_total_tokens: int = 40000
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
     def __post_init__(self) -> None:
-        if self.reasoning_effort not in REASONING_EFFORTS:
+        if self.reasoning_effort is not None and self.reasoning_effort not in REASONING_EFFORTS:
             raise ValueError(f"reasoning_effort must be one of {sorted(REASONING_EFFORTS)}")
         for name in ("max_steps", "max_tool_calls_total", "request_max_tokens",
                      "structured_max_tokens", "total_timeout_s", "per_tool_timeout_s",
@@ -190,7 +191,7 @@ class AgentResult:
     messages: list[dict[str, Any]]
     warnings: list[str] = field(default_factory=list)
     # Opt-in diagnostics, one dict per warning that has details (see
-    # ``meta_client.describe_error``). Never sent to the model and never logged.
+    # ``azure_client.describe_error``). Never sent to the model and never logged.
     warnings_detail: list[dict[str, Any]] = field(default_factory=list)
     # Usage and latency per phase; ``usage`` and ``latency_ms`` are the totals.
     phases: list[PhaseStats] = field(default_factory=list)

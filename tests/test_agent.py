@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from mirkaso_copilot.agent import FALLBACK_ANSWERS, AgentConfig, run_agent
-from mirkaso_copilot.meta_client import MetaAPIError
+from mirkaso_copilot.azure_client import AzureAPIError
 from mirkaso_copilot.providers import CallerContext, Tier
 from tests.conftest import AS_OF, FakeProvider, ScriptedClient, call, reply
 
@@ -79,7 +79,7 @@ async def test_parallel_tool_calls_run_concurrently(provider: FakeProvider) -> N
     first = client.requests[0]
     assert first["tool_choice"] == "auto"
     assert {t["function"]["name"] for t in first["tools"]} >= {"macro_get_regime"}
-    assert first["reasoning_effort"] == "low"
+    assert first["reasoning_effort"] is None  # not sent unless configured
     assert first["max_tokens"] == 3000
 
 
@@ -351,6 +351,11 @@ async def test_model_error_stops_without_raising(provider: FakeProvider) -> None
     assert _no_digits(result.answer)
 
 
+def test_config_reasoning_effort_is_optional() -> None:
+    assert AgentConfig().reasoning_effort is None
+    assert AgentConfig(reasoning_effort="high").reasoning_effort == "high"
+
+
 @pytest.mark.parametrize("effort", ["minimal", "max", ""])
 def test_config_rejects_unknown_reasoning_effort(effort: str) -> None:
     with pytest.raises(ValueError):
@@ -368,7 +373,7 @@ async def test_model_error_detail_stays_out_of_messages_and_logs(
 
     class Unauthorized:
         async def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
-            raise MetaAPIError("Meta API returned HTTP 401", status_code=401, body=body)
+            raise AzureAPIError("Azure OpenAI returned HTTP 401", status_code=401, body=body)
 
     with caplog.at_level(logging.DEBUG):
         result = await run_agent("q", provider=provider, ctx=CTX, client=Unauthorized())
@@ -378,7 +383,7 @@ async def test_model_error_detail_stays_out_of_messages_and_logs(
     assert result.warnings_detail == [
         {
             "warning": "model_request_failed",
-            "error_type": "MetaAPIError",
+            "error_type": "AzureAPIError",
             "status_code": 401,
             "message": f"Invalid API key ({SECRET})",
         }
