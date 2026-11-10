@@ -9,9 +9,9 @@ import httpx
 import pytest
 
 from mirkaso_copilot import demo
+from mirkaso_copilot.azure_client import REASONING_EFFORTS, AzureAPIError
 from mirkaso_copilot.demo import build_parser, main
 from mirkaso_copilot.envelope import utc_now
-from mirkaso_copilot.meta_client import REASONING_EFFORTS, MetaAPIError
 from tests.conftest import ScriptedClient, call, reply
 
 FAKE_KEY = "demo-test-key-not-real-123"
@@ -24,10 +24,11 @@ USAGE = {
 
 
 @pytest.fixture(autouse=True)
-def meta_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("META_API_KEY", FAKE_KEY)
-    monkeypatch.setenv("META_MODEL", "test-model")
-    for name in ("META_API_BASE", demo.PRICE_IN_ENV, demo.PRICE_OUT_ENV):
+def azure_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", FAKE_KEY)
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://test-resource.openai.azure.com")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "test-deployment")
+    for name in (demo.EFFORT_ENV, demo.PRICE_IN_ENV, demo.PRICE_OUT_ENV):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -54,7 +55,7 @@ def run_main(argv: list[str], client: ScriptedClient | None = None) -> tuple[int
 def test_parser_defaults() -> None:
     args = build_parser().parse_args(["What is up?"])
     assert args.question == "What is up?"
-    assert (args.tier, args.effort, args.json, args.show_tools) == ("trader", "low", False, False)
+    assert (args.tier, args.effort, args.json, args.show_tools) == ("trader", None, False, False)
 
 
 def test_effort_choices_match_the_client() -> None:
@@ -77,7 +78,7 @@ def test_parser_rejects_bad_arguments(argv: list[str]) -> None:
     assert exc.value.code == 2
 
 
-@pytest.mark.parametrize("missing", ["META_API_KEY", "META_MODEL"])
+@pytest.mark.parametrize("missing", demo.REQUIRED_ENV)
 def test_missing_env_is_a_config_error(missing: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(missing)
     code, out, err = run_main(["q"])
@@ -86,11 +87,26 @@ def test_missing_env_is_a_config_error(missing: str, monkeypatch: pytest.MonkeyP
     assert FAKE_KEY not in out + err
 
 
-def test_contributor_model_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("META_MODEL", "muse-spark-contributor")
-    code, _, err = run_main(["q"])
+def test_effort_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(demo.EFFORT_ENV, "high")
+    client = scripted()
+    code, _, _ = run_main(["q"], client)
+    assert code == 0
+    assert client.requests[0]["reasoning_effort"] == "high"
+
+
+def test_effort_option_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(demo.EFFORT_ENV, "high")
+    client = scripted()
+    run_main(["q", "--effort", "low"], client)
+    assert client.requests[0]["reasoning_effort"] == "low"
+
+
+def test_bad_effort_env_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(demo.EFFORT_ENV, "max")
+    code, _, err = run_main(["q"], scripted())
     assert code == 2
-    assert "-contributor" in err
+    assert demo.EFFORT_ENV in err
 
 
 def test_bad_prices_are_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,7 +143,7 @@ def test_end_to_end_text_output(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sectors["as_of"] == "2026-10-26T12:00:00Z"
     assert {s["asset_class"] for s in sectors["data"]["sectors"]} == {"crypto"}
     assert json.loads(tool_results[1]["content"])["data"]["score"] == 54.3
-    assert client.requests[0]["reasoning_effort"] == "low"
+    assert client.requests[0]["reasoning_effort"] is None
 
 
 def test_end_to_end_json_output() -> None:
@@ -181,7 +197,7 @@ UNAUTHORIZED_BODY = json.dumps(
 
 
 class FailingClient:
-    """Fails the first request the way MetaClient does."""
+    """Fails the first request the way AzureClient does."""
 
     def __init__(self, exc: BaseException) -> None:
         self.exc = exc
@@ -190,17 +206,17 @@ class FailingClient:
         raise self.exc
 
 
-def unauthorized() -> MetaAPIError:
-    return MetaAPIError("Meta API returned HTTP 401", status_code=401, body=UNAUTHORIZED_BODY)
+def unauthorized() -> AzureAPIError:
+    return AzureAPIError("Azure OpenAI returned HTTP 401", status_code=401, body=UNAUTHORIZED_BODY)
 
 
-def connection_error() -> MetaAPIError:
+def connection_error() -> AzureAPIError:
     try:
         try:
             raise httpx.ConnectError(f"cannot reach api.example with {FAKE_KEY}")
         except httpx.ConnectError as cause:
-            raise MetaAPIError("request failed: ConnectError") from cause
-    except MetaAPIError as exc:
+            raise AzureAPIError("request failed: ConnectError") from cause
+    except AzureAPIError as exc:
         return exc
 
 
@@ -209,11 +225,11 @@ def test_verbose_prints_http_status_and_message() -> None:
     assert code == 1
     assert "stop_reason: error" in out
     line = next(ln for ln in err.splitlines() if ln.startswith("model error:"))
-    assert line.startswith("model error: HTTP 401 (MetaAPIError): Invalid API key. xxx")
+    assert line.startswith("model error: HTTP 401 (AzureAPIError): Invalid API key. xxx")
     message = line.split(": ", 2)[2]
     assert len(message) == 200
     assert FAKE_KEY not in out + err
-    assert "Authorization" not in out + err
+    assert "api-key" not in out + err
 
 
 def test_verbose_connection_error_prints_type_only() -> None:
@@ -230,7 +246,7 @@ def test_verbose_json_includes_details() -> None:
     assert detail == [
         {
             "warning": "model_request_failed",
-            "error_type": "MetaAPIError",
+            "error_type": "AzureAPIError",
             "status_code": 401,
             "message": json.loads(UNAUTHORIZED_BODY)["error"]["message"][:200],
         }
@@ -239,7 +255,7 @@ def test_verbose_json_includes_details() -> None:
 
 def test_verbose_masks_the_key_if_the_api_echoes_it() -> None:
     body = json.dumps({"error": {"message": f"key {FAKE_KEY} is revoked"}})
-    exc = MetaAPIError("Meta API returned HTTP 401", status_code=401, body=body)
+    exc = AzureAPIError("Azure OpenAI returned HTTP 401", status_code=401, body=body)
     _, out, err = run_main(["q", "--verbose", "--json"], FailingClient(exc))
     assert "key *** is revoked" in err
     assert FAKE_KEY not in out + err

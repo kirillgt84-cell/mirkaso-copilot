@@ -1,54 +1,43 @@
 # Mirkaso Copilot
 
-An agentic market assistant built on **Meta Muse Spark** with function calling over
+An agentic market assistant built on **Azure OpenAI** with function calling over
 Mirkaso's public market data: scanner signals, sector indices, the macro risk regime
 and per-coin derivatives.
 
-Built during the **Meta Global AI Developer Hackathon, Oct 26 – Nov 4, 2026**. The build
-period began when the Oct 26 kickoff ended at 12:24 PM ET (16:24 UTC). Times below are
-in UTC.
-
-## Pre-existing work (declared)
+## Relation to the Mirkaso product
 
 - **Mirkaso platform** ([mirkaso.com](https://mirkaso.com)): a crypto derivatives
-  analytics platform built before the hackathon, with its scanner, sector indices, macro
-  regime and derivatives data. It is closed source. This repository contains neither its
-  code nor its history; the Copilot reads its data through the `DataProvider` interface,
-  so from the point of view of this package Mirkaso is a pre-existing service.
-- **Opt-in Meta Model API provider** in the private Mirkaso product repository, committed
-  on Oct 26, 2026 at 12:32 UTC, before the kickoff ended. It is not part of this
-  repository.
-
-## Built during the hackathon
-
-- **This repository** was created on Oct 26, 2026 at 18:38 UTC, after the kickoff ended,
-  and every commit in it is dated after the kickoff: the tool layer and Meta Model API
-  client, the agent loop with parallel tool calls, the demo CLI, structured answers with
-  server-resolved numbers, the numeric grounding guard, and the removal of the
-  liquidations tool, which leaves four tools.
-- **In the private product repository** (not part of this package), from Oct 27: the data
-  adapter for this package, the Copilot API behind a feature flag, the chat panel, an EU
-  forwarding proxy for the Meta Model API, and the production release.
+  analytics platform with its scanner, sector indices, macro regime and derivatives
+  data. It is closed source. This repository contains neither its code nor its history;
+  the Copilot reads its data through the `DataProvider` interface, so from the point of
+  view of this package Mirkaso is an external service.
+- **This repository** holds the tool layer, the Azure OpenAI client, the agent loop with
+  parallel tool calls, the demo CLI, structured answers with server-resolved numbers and
+  the numeric grounding guard.
+- **The private product repository** (not part of this package) holds the data adapter
+  for this package, the Copilot API behind a feature flag and the chat panel.
 
 ## Try it
 
-Run the agent against the real Meta Model API with bundled **synthetic demo data**.
-You only need a Meta API key; no access to the private Mirkaso product. By default the
-demo shifts every fixture timestamp to the current time, so the data looks live.
+Run the agent against a real Azure OpenAI deployment with bundled **synthetic demo
+data**. You only need an Azure OpenAI resource with a chat model deployment; no access to
+the private Mirkaso product. By default the demo shifts every fixture timestamp to the
+current time, so the data looks live.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-export META_API_KEY=...            # your key; read from the environment, never printed
-export META_MODEL=muse-spark-1.3   # required, no default; never a "-contributor" model
-# export META_API_BASE=...         # optional, defaults to https://api.meta.ai/v1
-# export META_PRICE_IN_PER_M=...   # optional: USD per 1M prompt tokens
-# export META_PRICE_OUT_PER_M=...  # optional: USD per 1M completion tokens
+export AZURE_OPENAI_API_KEY=...       # your key; read from the environment, never printed
+export AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
+export AZURE_OPENAI_DEPLOYMENT=...    # the deployment name, not the model name
+# export AZURE_OPENAI_REASONING_EFFORT=low  # optional, reasoning models only
+# export AZURE_PRICE_IN_PER_M=...     # optional: USD per 1M prompt tokens
+# export AZURE_PRICE_OUT_PER_M=...    # optional: USD per 1M completion tokens
 
 mirkaso-copilot-demo "Which sectors are strongest right now and is the macro regime supportive?"
 mirkaso-copilot-demo "Any unusual BTC or SOL activity?" --show-tools
-mirkaso-copilot-demo "How are BTC open interest and funding moving?" --effort medium
+mirkaso-copilot-demo "How are BTC open interest and funding moving?" --effort medium  # reasoning models
 mirkaso-copilot-demo "What are the top scanner signals?" --tier guest --json
 mirkaso-copilot-demo "Is the macro regime improving?" --fixed-time   # stored 2026-10-26 times
 mirkaso-copilot-demo "Any unusual BTC activity?" --verbose           # show why a request failed
@@ -60,7 +49,7 @@ mirkaso-copilot-demo "Which sector is strongest right now?" --structured  # serv
 | Option | Default | Meaning |
 |---|---|---|
 | `--tier guest\|starter\|trader\|pro` | `trader` | Plan tier the data is gated for (try `guest` to see masking) |
-| `--effort low\|medium\|high` | `low` | Model reasoning effort |
+| `--effort low\|medium\|high` | `AZURE_OPENAI_REASONING_EFFORT`, else not sent | Model reasoning effort. Only for reasoning models: models without reasoning reject the parameter with HTTP 400 |
 | `--show-tools` | off | Print each tool call with its arguments, `ok` or error code, and latency |
 | `--json` | off | Print the full `AgentResult` as JSON: tool call records, usage, warnings and transcript |
 | `--fixed-time` | off | Keep the stored timestamps (base time `2026-10-26T12:00:00Z`) instead of shifting them to now |
@@ -96,7 +85,7 @@ reason and 2 for a configuration error.
 ## How it works
 
 ```
-user ──► host app ──► Muse Spark (Meta Model API, /chat/completions)
+user ──► host app ──► Azure OpenAI deployment (/openai/v1/chat/completions)
             │                 │ tool_calls
             │                 ▼
             │        tools.registry.execute_tool(name, args, provider, ctx)
@@ -122,9 +111,11 @@ user ──► host app ──► Muse Spark (Meta Model API, /chat/completions)
   See [Tiers](#tiers).
 - **Downsampling**: history series are rebucketed to at most 48 points to keep the
   context small.
-- `meta_client.MetaClient` is a minimal async client for the Meta Model API
-  (`tools`, `tool_choice`, `response_format`, `reasoning_effort` low/medium/high) that
-  logs token usage, including reasoning tokens.
+- `azure_client.AzureClient` is a minimal async client for the Azure OpenAI v1 chat
+  completions API (`<endpoint>/openai/v1/chat/completions`, `api-key` header, the
+  deployment name as `model`, no `api-version` needed). It sends `tools`, `tool_choice`,
+  `response_format`, `max_completion_tokens` and, only when set, `reasoning_effort`
+  (low/medium/high), and logs token usage, including reasoning tokens.
 
 ## Tools
 
@@ -157,9 +148,9 @@ Limits (`AgentConfig`, all overridable):
 | `max_steps` | 6 | Model requests per run |
 | `max_tool_calls_total` | 12 | Tool calls per run |
 | `max_total_tokens` | 40000 | Tokens summed over all requests |
-| `request_max_tokens` | 3000 | `max_tokens` per request (reasoning tokens count toward it) |
-| `structured_max_tokens` | 6000 | `max_tokens` per structured request (and every request in single-phase mode) |
-| `reasoning_effort` | `low` | `low`, `medium` or `high` |
+| `request_max_tokens` | 3000 | `max_completion_tokens` per request (reasoning tokens count toward it) |
+| `structured_max_tokens` | 6000 | `max_completion_tokens` per structured request (and every request in single-phase mode) |
+| `reasoning_effort` | `None` | `low`, `medium` or `high`; `None` sends no `reasoning_effort`, which models without reasoning require |
 | `per_tool_timeout_s` | 15 | Time limit for one tool call |
 | `total_timeout_s` | 90 | Time limit for the whole run |
 
@@ -218,8 +209,8 @@ How it works:
 2. **Phase B**: after the final answer, one more request **without tools** and with
    `response_format` set to the strict JSON schema of `StructuredAnswer`
    ([`answer.py`](src/mirkaso_copilot/answer.py)), with its own token limit
-   (`structured_max_tokens`, 6000). The live model spends about two thirds of its
-   completion tokens on reasoning even at effort `low`. The request sends the whole
+   (`structured_max_tokens`, 6000). A reasoning model can spend most of its
+   completion tokens on reasoning, even at effort `low`. The request sends the whole
    transcript plus an instruction with the placeholder rules and a **list of every
    executed call by alias**:
 
@@ -399,7 +390,7 @@ the four is treated as `guest`, so a mapping mistake fails closed.
 | Result envelope and error model | Database schema, SQL and storage |
 | Tier gating and downsampling (pure functions) | Scanner and scoring logic |
 | `DataProvider` protocol, a test fake and a synthetic-data `FixtureProvider` | The production `DataProvider` implementation |
-| Meta Model API client | Accounts, billing and tier resolution |
+| Azure OpenAI client | Accounts, billing and tier resolution |
 
 The private product plugs in by implementing `mirkaso_copilot.providers.DataProvider`.
 This repository contains no credentials, no internal table names and no proprietary
@@ -418,15 +409,11 @@ pytest
 
 Tests use a fake provider and make no network calls.
 
-To call the Meta Model API, copy `.env.example` to `.env` (git-ignored) and set
-`META_API_KEY`, `META_MODEL` (e.g. `muse-spark-1.3`) and optionally `META_API_BASE`.
-The code has no default model.
-
-> **Never use a model ID ending in `-contributor`.** Those variants may be trained on
-> the data you send. Use only the standard model.
-
-The client reads these
-from the process environment only.
+To call Azure OpenAI, copy `.env.example` to `.env` (git-ignored) and set
+`AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` (`https://<resource>.openai.azure.com`)
+and `AZURE_OPENAI_DEPLOYMENT` (the name of your deployment), and optionally
+`AZURE_OPENAI_REASONING_EFFORT` for a reasoning model. The code has no default
+deployment. The client reads these from the process environment only.
 
 ## License
 

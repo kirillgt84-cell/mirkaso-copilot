@@ -1,18 +1,20 @@
-"""Live demo: one question through the Meta Model API, the agent loop and fixture data.
+"""Live demo: one question through Azure OpenAI, the agent loop and fixture data.
 
 Usage::
 
     mirkaso-copilot-demo "Which sectors are strongest right now?" [--tier trader]
-        [--effort low] [--json] [--show-tools] [--fixed-time] [--verbose] [--structured]
+        [--effort low|medium|high] [--json] [--show-tools] [--fixed-time] [--verbose] [--structured]
         [--single-phase]
 
-Reads ``META_API_KEY`` and ``META_MODEL`` (both required) and ``META_API_BASE``
-(optional) from the environment. The key is never printed. If ``META_PRICE_IN_PER_M``
-and ``META_PRICE_OUT_PER_M`` (USD per million prompt / completion tokens) are set, an
-estimated cost is printed too. All market data is synthetic demo data, shifted to the
-current time unless ``--fixed-time`` is given. ``--structured`` returns only a verified
-answer: a structured answer whose values are resolved against the tool results and that
-passes the grounding guard, or a refusal. ``--single-phase`` (implies ``--structured``)
+Reads ``AZURE_OPENAI_API_KEY``, ``AZURE_OPENAI_ENDPOINT`` and ``AZURE_OPENAI_DEPLOYMENT``
+(all required) from the environment. The key is never printed. ``reasoning_effort`` is
+sent only when ``--effort`` or ``AZURE_OPENAI_REASONING_EFFORT`` sets it, since models
+without reasoning reject it. If ``AZURE_PRICE_IN_PER_M`` and ``AZURE_PRICE_OUT_PER_M``
+(USD per million prompt / completion tokens) are set, an estimated cost is printed too.
+All market data is synthetic demo data, shifted to the current time unless
+``--fixed-time`` is given. ``--structured`` returns only a verified answer: a structured
+answer whose values are resolved against the tool results and that passes the grounding
+guard, or a refusal. ``--single-phase`` (implies ``--structured``)
 is an experiment that sends the schema with every tool-loop request.
 
 Exit status: 0 when the model gave a final answer (with ``--structured``: a verified
@@ -29,16 +31,16 @@ from dataclasses import asdict
 from typing import Any, TextIO
 
 from mirkaso_copilot.agent import AgentConfig, AgentResult, ChatClient, run_agent
+from mirkaso_copilot.azure_client import AzureClient, AzureConfigError
 from mirkaso_copilot.fixture_provider import BASE_TIME, SYNTHETIC_NOTICE, FixtureProvider
-from mirkaso_copilot.meta_client import MetaClient, MetaConfigError
 from mirkaso_copilot.providers import CallerContext, DataProvider, Tier
 
 EFFORTS = ("low", "medium", "high")
-REQUIRED_ENV = ("META_API_KEY", "META_MODEL")
-PRICE_IN_ENV = "META_PRICE_IN_PER_M"
-PRICE_OUT_ENV = "META_PRICE_OUT_PER_M"
-# Contributor model variants may be trained on the data sent to them.
-FORBIDDEN_MODEL_SUFFIX = "-contributor"
+REQUIRED_ENV = ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT")
+KEY_ENV = "AZURE_OPENAI_API_KEY"
+EFFORT_ENV = "AZURE_OPENAI_REASONING_EFFORT"
+PRICE_IN_ENV = "AZURE_PRICE_IN_PER_M"
+PRICE_OUT_ENV = "AZURE_PRICE_OUT_PER_M"
 
 
 class DemoConfigError(Exception):
@@ -56,8 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Plan tier the data is gated for (default: trader).",
     )  # fmt: skip
     parser.add_argument(
-        "--effort", choices=EFFORTS, default="low",
-        help="Model reasoning effort (default: low).",
+        "--effort", choices=EFFORTS, default=None,
+        help=f"Model reasoning effort, for reasoning models only (default: {EFFORT_ENV}, "
+        "else not sent).",
     )  # fmt: skip
     parser.add_argument(
         "--json", action="store_true",
@@ -104,6 +107,18 @@ def read_prices(env: Mapping[str, str]) -> tuple[float, float] | None:
     return prices
 
 
+def read_effort(effort: str | None, env: Mapping[str, str]) -> str | None:
+    """``--effort`` if given, else ``AZURE_OPENAI_REASONING_EFFORT``, else None (not sent)."""
+    if effort is not None:
+        return effort
+    raw = env.get(EFFORT_ENV)
+    if not raw:
+        return None
+    if raw not in EFFORTS:
+        raise DemoConfigError(f"{EFFORT_ENV} must be one of {', '.join(EFFORTS)}")
+    return raw
+
+
 def estimate_cost(result: AgentResult, prices: tuple[float, float]) -> float:
     # Reasoning tokens are already part of completion_tokens.
     price_in, price_out = prices
@@ -113,14 +128,10 @@ def estimate_cost(result: AgentResult, prices: tuple[float, float]) -> float:
 
 
 def check_env(env: Mapping[str, str]) -> None:
-    """Fail before any work if the Meta client could not start or the model is unsafe."""
+    """Fail before any work if the Azure client could not start."""
     for name in REQUIRED_ENV:
         if not env.get(name):
             raise DemoConfigError(f"{name} is not set")
-    if env["META_MODEL"].endswith(FORBIDDEN_MODEL_SUFFIX):
-        raise DemoConfigError(
-            f"META_MODEL ends with '{FORBIDDEN_MODEL_SUFFIX}'; use the standard model instead"
-        )
 
 
 def format_tool_calls(result: AgentResult) -> list[str]:
@@ -252,8 +263,8 @@ async def ask(args: argparse.Namespace, client: ChatClient, provider: DataProvid
     )
 
 
-async def _run_with_meta(args: argparse.Namespace, provider: DataProvider) -> AgentResult:
-    async with MetaClient() as client:
+async def _run_with_azure(args: argparse.Namespace, provider: DataProvider) -> AgentResult:
+    async with AzureClient() as client:
         return await ask(args, client, provider)
 
 
@@ -264,7 +275,7 @@ def main(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    """Run the demo. ``client`` replaces the Meta client (tests use a scripted fake)."""
+    """Run the demo. ``client`` replaces the Azure client (tests use a scripted fake)."""
     args = build_parser().parse_args(argv)
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
@@ -272,6 +283,7 @@ def main(
 
     try:
         prices = read_prices(os.environ)
+        args.effort = read_effort(args.effort, os.environ)
         if client is None:
             check_env(os.environ)
         timing = (
@@ -281,14 +293,14 @@ def main(
         )
         print(f"note: {SYNTHETIC_NOTICE} ({timing}; tier {args.tier})", file=stderr)
         if client is None:
-            result = asyncio.run(_run_with_meta(args, provider))
+            result = asyncio.run(_run_with_azure(args, provider))
         else:
             result = asyncio.run(ask(args, client, provider))
-    except (DemoConfigError, MetaConfigError) as exc:
+    except (DemoConfigError, AzureConfigError) as exc:
         print(f"error: {exc}", file=stderr)
         return 2
 
-    secret = os.environ.get("META_API_KEY")
+    secret = os.environ.get(KEY_ENV)
     if args.verbose:
         for line in format_details(result, secret):
             print(line, file=stderr)
